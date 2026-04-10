@@ -384,7 +384,7 @@ export default function MastersPool() {
       }
 
       if (map["Hojgaard, Rasmus"]) {
-        console.log("Hojgaard mapped score:", map["Hojgaard, Rasmus"]);
+        console.log("Hojgaard, rASUMS mapped score:", map["Hojgaard, Rasmus"]);
       }
 
       if (Object.keys(map).length > 0) {
