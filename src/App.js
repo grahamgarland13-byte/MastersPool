@@ -313,44 +313,53 @@ export default function MastersPool() {
       .sort((a, b) => b.payout - a.payout);
   }, [rows, prizes]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setFetchError(null);
+const refresh = useCallback(async () => {
+  setLoading(true);
+  setFetchError(null);
 
-    try {
-      const data = await fetchESPN();
-      const map = {};
+  try {
+    const data = await fetchESPN();
+    const map = {};
+    const unmatched = [];
 
-      for (const ap of data.players || []) {
-        const pool = matchPlayer(ap.name);
-        if (!pool) continue;
+    for (const ap of data.players || []) {
+      const pool = matchPlayer(ap.name);
 
-        map[pool[0]] = {
-          r1: ap.r1,
-          r2: ap.r2,
-          total: ap.total ?? ((ap.r1 ?? 0) + (ap.r2 ?? 0)),
-          thru: ap.thru ?? "–",
-        };
+      if (!pool) {
+        unmatched.push(ap.name);
+        continue;
       }
 
-      if (Object.keys(map).length > 0) {
-        setLiveMap(map);
-        setMeta({ round: data.round, status: data.status });
-      } else {
-        setMeta({ round: "Seeded Data", status: "No matching live players found" });
-      }
-
-      setLastUpdated(new Date());
-    } catch (e) {
-      setFetchError(e?.message || "Unknown error");
-      setMeta((prev) => ({
-        round: prev.round || "Seeded Data",
-        status: "Seeded Data",
-      }));
-    } finally {
-      setLoading(false);
+      map[pool[0]] = {
+        r1: ap.r1,
+        r2: ap.r2,
+        total: ap.total ?? ((ap.r1 ?? 0) + (ap.r2 ?? 0)),
+        thru: ap.thru ?? "–",
+      };
     }
-  }, []);
+
+    if (unmatched.length) {
+      console.log("Unmatched ESPN players:", unmatched);
+    }
+
+    if (Object.keys(map).length > 0) {
+      setLiveMap(map);
+      setMeta({ round: data.round, status: data.status });
+    } else {
+      setMeta({ round: "Seeded Data", status: "No matching live players found" });
+    }
+
+    setLastUpdated(new Date());
+  } catch (e) {
+    setFetchError(e?.message || "Unknown error");
+    setMeta((prev) => ({
+      round: prev.round || "Seeded Data",
+      status: "Seeded Data",
+    }));
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     refresh();
