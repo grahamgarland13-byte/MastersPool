@@ -81,7 +81,7 @@ const POOL = [
   ["Garcia, Sergio", [["VERCHOTTA", 0.5]], ["sergio garcia", "garcia"], 3, null],
   ["Henley, Russell", [["HOCH", 0.333], ["ORR", 0.333], ["BARRY", 0.167], ["GUTSCHOW", 0.167]], ["russell henley", "henley"], 3, null],
   ["Hojgaard, Rasmus", [["BAR", 0.5], ["KRAHN", 0.5]], ["rasmus hojgaard", "rasmus højgaard", "rasmus hogaard"], 3, null],
-  ["Hojgaard, nICOLAI", [["BAR", 0.5], ["KRAHN", 0.5]], ["nICOLAI hojgaard", "nICOLAI højgaard", "nICOLAI hogaard"], 3, null],
+  ["Hojgaard, Nicolai", [["BAR", 0.5], ["KRAHN", 0.5]], ["nicolai hojgaard", "nicolai højgaard", "nicolai hogaard"], 3, null],
   ["Watson, Bubba", [["KRAHN", 0.333]], ["bubba watson", "watson"], 4, null],
   ["DeChambeau, Bryson", [["KRAHN", 0.5], ["KING", 0.25], ["MALLOY", 0.25]], ["bryson dechambeau", "dechambeau"], 4, null],
   ["Rahm, Jon", [["VERCHOTTA", 0.5]], ["jon rahm", "rahm"], 6, null],
@@ -122,6 +122,7 @@ function scoreColor(s) {
 function parseScore(value) {
   if (value === null || value === undefined || value === "") return null;
   const str = String(value).trim();
+  if (!str) return null;
   if (str === "E" || str.toLowerCase() === "even") return 0;
   const n = parseInt(str, 10);
   return Number.isNaN(n) ? null : n;
@@ -188,7 +189,7 @@ function normalizePlayerScores(r1, r2, total, displayName = "") {
         player: displayName,
         r1,
         r2,
-        espnTotal: total,
+        scrapedTotal: total,
         computedTotal: computed,
       });
     }
@@ -250,50 +251,106 @@ function buildRows(liveMap) {
   });
 }
 
-// - ESPN FETCH -
-async function fetchESPN() {
-  const url = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
-  const res = await fetch(url, { method: "GET" });
-  if (!res.ok) throw new Error(`ESPN API ${res.status}`);
+// - MASTERS HTML FETCH/PARSE -
+function parseMastersScreenReaderText(text) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
 
-  const data = await res.json();
-  const events = data?.events || [];
-  const masters =
-    events.find(
-      (e) =>
-        e?.name?.toLowerCase().includes("masters") ||
-        e?.shortName?.toLowerCase().includes("masters")
-    ) || events[0];
+  const nameMatch = clean.match(/^Player\s+(.+?),\s*Position/i);
+  const todayMatch = clean.match(/Today's score is\s*([+\-]?\d+|E)/i);
+  const totalMatch = clean.match(/To par total score is\s*([+\-]?\d+|E)/i);
+  const roundScoreMatch = clean.match(/Round\s+\d+\s+score\s+is\s*([+\-]?\d+|E|\d+)/i);
+  const missedCut = /MISSED CUT/i.test(clean);
 
-  if (!masters) throw new Error("No event found in ESPN feed");
+  return {
+    rawName: nameMatch?.[1]?.trim() || "",
+    today: parseScore(todayMatch?.[1] ?? null),
+    total: parseScore(totalMatch?.[1] ?? null),
+    roundScore: roundScoreMatch?.[1] ?? null,
+    missedCut,
+    raw: clean,
+  };
+}
 
-  const comp = masters?.competitions?.[0];
-  if (!comp) throw new Error("No competition data");
+function canonicalizeMastersName(rawName) {
+  const clean = String(rawName || "")
+    .replace(/\s*,\s*Amateur$/i, "")
+    .trim();
 
-  const status = comp?.status?.type?.description || "In Progress";
-  const round = comp?.status?.period ? `Round ${comp.status.period}` : "In Progress";
+  const pool = matchPlayer(clean);
+  if (pool) return pool[0];
 
-  const players = (comp?.competitors || [])
-    .map((c) => {
-      const name = c?.athlete?.displayName || "";
-      const scores = c?.linescores || [];
-      const r1 = scores[0] ? parseScore(scores[0].value ?? scores[0].displayValue) : null;
-      const r2 = scores[1] ? parseScore(scores[1].value ?? scores[1].displayValue) : null;
-      const total = parseScore(c?.score ?? c?.total);
-      const thru =
-        c?.status?.thru !== undefined && c?.status?.thru !== null
-          ? c.status.thru === 0
-            ? "F"
-            : String(c.status.thru)
-          : c?.status?.type?.completed
-            ? "F"
-            : "–";
+  return clean;
+}
 
-      return { name, r1, r2, total, thru };
-    })
-    .filter((p) => p.name);
+function extractMastersPlayersFromHtml(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
 
-  return { round, status, players };
+  const allSection = doc.querySelector("#leaderBoardPlayersContent");
+  if (!allSection) {
+    throw new Error("Masters leaderboard HTML structure not found");
+  }
+
+  const screenReaderNodes = Array.from(allSection.querySelectorAll(".screen-reader-only"));
+  const players = [];
+
+  for (const node of screenReaderNodes) {
+    const parsed = parseMastersScreenReaderText(node.textContent || "");
+    if (!parsed.rawName) continue;
+
+    const displayName = canonicalizeMastersName(parsed.rawName);
+
+    let r2 = parsed.today;
+    let total = parsed.total;
+    let r1 = null;
+
+    if (r2 !== null && total !== null) {
+      r1 = total - r2;
+    }
+
+    players.push({
+      name: displayName,
+      r1,
+      r2,
+      total,
+      thru: parsed.missedCut ? "MC" : "F",
+      missedCut: parsed.missedCut,
+      rawName: parsed.rawName,
+    });
+  }
+
+  const deduped = new Map();
+  for (const p of players) {
+    if (!deduped.has(p.name)) {
+      deduped.set(p.name, p);
+    }
+  }
+
+  return Array.from(deduped.values());
+}
+
+async function fetchMastersLeaderboard() {
+  const url = "https://www.masters.com/en_US/scores/index.html";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "text/html",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Masters HTML ${res.status}`);
+  }
+
+  const html = await res.text();
+  const players = extractMastersPlayersFromHtml(html);
+
+  return {
+    round: "Round 2",
+    status: "Masters Leaderboard",
+    players,
+  };
 }
 
 export default function MastersPool() {
@@ -353,7 +410,7 @@ export default function MastersPool() {
     setFetchError(null);
 
     try {
-      const data = await fetchESPN();
+      const data = await fetchMastersLeaderboard();
       const map = {};
       const unmatched = [];
 
@@ -380,11 +437,7 @@ export default function MastersPool() {
       }
 
       if (unmatched.length) {
-        console.log("Unmatched ESPN players:", unmatched);
-      }
-
-      if (map["Hojgaard, Rasmus"]) {
-        console.log("Hojgaard, rASUMS mapped score:", map["Hojgaard, Rasmus"]);
+        console.log("Unmatched Masters players:", unmatched);
       }
 
       if (Object.keys(map).length > 0) {
@@ -588,7 +641,7 @@ export default function MastersPool() {
 
             {fetchError ? (
               <span style={{ color: "#ffe6e6", fontSize: 11, fontWeight: 700 }}>
-                ESPN fetch failed ({fetchError}) — showing seeded data
+                Masters fetch failed ({fetchError}) — showing seeded data
               </span>
             ) : lastUpdated ? (
               <span style={{ color: "#eef6ee", fontSize: 11, fontWeight: 700 }}>
