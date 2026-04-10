@@ -81,7 +81,7 @@ const POOL = [
   ["Bhatia, Akshay", [["KING", 0.5], ["MALLOY", 0.5]], ["akshay bhatia", "bhatia"], 3, null],
   ["Garcia, Sergio", [["VERCHOTTA", 0.5]], ["sergio garcia", "garcia"], 3, null],
   ["Henley, Russell", [["HOCH", 0.333], ["ORR", 0.333], ["BARRY", 0.167], ["GUTSCHOW", 0.167]], ["russell henley", "henley"], 3, null],
-  ["Hogaard, Rasmus", [["BAR", 0.5], ["KRAHN", 0.5]], ["rasmus hojgaard", "rasmus højgaard", "rasmus hogaard", "hojgaard", "hogaard"], 3, null],
+  ["Hojgaard, Rasmus", [["BAR", 0.5], ["KRAHN", 0.5]], ["rasmus hojgaard", "rasmus højgaard", "rasmus hogaard", "hojgaard", "hogaard"], 3, null],
   ["Watson, Bubba", [["KRAHN", 0.333]], ["bubba watson", "watson"], 4, null],
   ["DeChambeau, Bryson", [["KRAHN", 0.5], ["KING", 0.25], ["MALLOY", 0.25]], ["bryson dechambeau", "dechambeau"], 4, null],
   ["Rahm, Jon", [["VERCHOTTA", 0.5]], ["jon rahm", "rahm"], 6, null],
@@ -144,39 +144,39 @@ function matchPlayer(name) {
   const n = normalizeName(name);
   if (!n) return null;
 
-  for (const p of POOL) {
-    const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
-    if (aliases.includes(n)) return p;
-  }
-
-  for (const p of POOL) {
+  const normalizedPool = POOL.map((p) => {
     const display = normalizeName(p[0]);
+    const aliases = [display, ...(p[2] || []).map(normalizeName)];
     const parts = display.split(" ");
-    if (parts.length >= 2) {
-      const reordered = `${parts.slice(1).join(" ")} ${parts[0]}`.trim();
-      if (reordered === n) return p;
-    }
+    const reordered =
+      parts.length >= 2 ? `${parts.slice(1).join(" ")} ${parts[0]}`.trim() : display;
+
+    return {
+      original: p,
+      display,
+      reordered,
+      aliases: [...new Set([...aliases, reordered])],
+    };
+  });
+
+  // 1. exact alias/full-name match
+  for (const p of normalizedPool) {
+    if (p.aliases.includes(n)) return p.original;
   }
 
-  for (const p of POOL) {
-    const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
-    if (aliases.some((a) => a.includes(n) || n.includes(a))) return p;
+  // 2. exact last-name + first-name containment
+  for (const p of normalizedPool) {
+    if (p.aliases.some((a) => a.includes(n) || n.includes(a))) return p.original;
   }
 
-  const words = n.split(" ");
-  const last = words[words.length - 1];
+  // 3. last-name fallback only as a last resort
+  const last = n.split(" ").pop();
   if (last && last.length >= 4) {
-    for (const p of POOL) {
-      const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
-      if (
-        aliases.some((a) => {
-          const aliasWords = a.split(" ");
-          return aliasWords[aliasWords.length - 1] === last;
-        })
-      ) {
-        return p;
-      }
-    }
+    const candidates = normalizedPool.filter((p) =>
+      p.aliases.some((a) => a.split(" ").pop() === last)
+    );
+
+    if (candidates.length === 1) return candidates[0].original;
   }
 
   return null;
