@@ -14,15 +14,35 @@ const TEAM_BIDS = {
 };
 
 const TEAM_COLORS = {
-  KING: "#1a3a5c",
-  HOCH: "#2d5016",
-  MALLOY: "#7b3308",
-  KRAHN: "#5a1e8c",
-  GUTSCHOW: "#6b3200",
-  BARRY: "#9b0000",
-  VERCHOTTA: "#004d6b",
-  ORR: "#333333",
-  BAR: "#005a5a",
+  KING: "#1f4e79",
+  HOCH: "#2f6f3e",
+  MALLOY: "#8b5a2b",
+  KRAHN: "#5b3c88",
+  GUTSCHOW: "#7a4a21",
+  BARRY: "#a13d2d",
+  VERCHOTTA: "#2b6f77",
+  ORR: "#4a4a4a",
+  BAR: "#2d7a78",
+};
+
+const COLORS = {
+  bg: "#0b1f14",
+  panel: "#0f2a1d",
+  panelAlt: "#123524",
+  headerGrad1: "#0b1f14",
+  headerGrad2: "#1f5a3a",
+  gold: "#c8a951",
+  goldSoft: "#d8c27a",
+  text: "#f5f1e6",
+  muted: "#9bb8a5",
+  border: "#1e4d36",
+  hover: "#163d2b",
+  liveGreen: "#6bcf8f",
+  danger: "#ff9a9a",
+  positive: "#6bcf8f",
+  negative: "#ff7a7a",
+  even: "#d8c27a",
+  empty: "#486353",
 };
 
 // [displayName, [[team,pct],...], [aliases], r1_seed, r2_seed]
@@ -35,7 +55,7 @@ const POOL = [
   ["Clark, Wyndham", [["KRAHN", 1]], ["wyndham clark", "clark"], 0, -4],
   ["Rose, Justin", [["KING", 1]], ["justin rose", "rose"], -2, -2],
   ["Scheffler, Scottie", [["BARRY", 0.25], ["MALLOY", 0.5], ["KING", 0.25]], ["scottie scheffler", "scheffler"], -2, 2],
-  ["Aberg, Ludvig", [["VERCHOTTA", 0.5], ["KING", 0.5]], ["ludvig aberg", "ludvig åberg", "aberg", "aberg"], -1, null],
+  ["Aberg, Ludvig", [["VERCHOTTA", 0.5], ["KING", 0.5]], ["ludvig aberg", "ludvig åberg", "aberg"], -1, null],
   ["Koepka, Brooks", [["BAR", 0.5], ["KING", 0.5]], ["brooks koepka", "koepka"], -1, -1],
   ["Hovland, Viktor", [["BARRY", 0.25], ["GUTSCHOW", 0.25], ["ORR", 0.5]], ["viktor hovland", "hovland"], -1, null],
   ["Morikawa, Collin", [["HOCH", 0.5], ["GUTSCHOW", 0.5]], ["collin morikawa", "morikawa"], 0, null],
@@ -43,7 +63,7 @@ const POOL = [
   ["Schauffele, Xander", [["HOCH", 1]], ["xander schauffele", "schauffele"], 1, null],
   ["Im, Sungjae", [["MALLOY", 0.5], ["KING", 0.5]], ["sungjae im", "im"], 1, 0],
   ["Fleetwood, Tommy", [["HOCH", 0.5]], ["tommy fleetwood", "fleetwood"], 1, null],
-  ["Lee, Min Woo", [["HOCH", 0.667], ["BARRY", 0.333]], ["min woo lee", "min woo", "min-woo lee"], 1, null],
+  ["Lee, Min Woo", [["HOCH", 0.667], ["BARRY", 0.333]], ["min woo lee", "min-woo lee", "min woo"], 1, null],
   ["Woodland, Gary", [["KRAHN", 0.5]], ["gary woodland", "woodland"], 1, 0],
   ["Greyserman, Max", [["KING", 1]], ["max greyserman", "greyserman"], 2, null],
   ["Thomas, Justin", [["KING", 0.5]], ["justin thomas", "thomas"], 2, null],
@@ -94,8 +114,8 @@ function fmtMoney(n) {
 }
 
 function scoreColor(s) {
-  if (s === null || s === undefined) return "#4a6a5a";
-  return s < 0 ? "#5dba5d" : s > 0 ? "#e05050" : "#c9a84c";
+  if (s === null || s === undefined) return COLORS.muted;
+  return s < 0 ? COLORS.positive : s > 0 ? COLORS.negative : COLORS.even;
 }
 
 function parseScore(value) {
@@ -108,8 +128,8 @@ function parseScore(value) {
 
 function normalizeName(name) {
   return String(name || "")
-    .normalize("NFD")                 // split accented chars
-    .replace(/[\u0300-\u036f]/g, "")  // remove accents/diacritics
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\./g, "")
     .replace(/,/g, "")
     .replace(/'/g, "")
@@ -123,38 +143,36 @@ function matchPlayer(name) {
   const n = normalizeName(name);
   if (!n) return null;
 
-  // exact alias match first
   for (const p of POOL) {
     const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
     if (aliases.includes(n)) return p;
   }
 
-  // exact reordered-name match
   for (const p of POOL) {
-    const display = normalizeName(p[0]); // e.g. "hogaard rasmus"
+    const display = normalizeName(p[0]);
     const parts = display.split(" ");
     if (parts.length >= 2) {
-      const reordered = `${parts.slice(1).join(" ")} ${parts[0]}`.trim(); // "rasmus hogaard"
+      const reordered = `${parts.slice(1).join(" ")} ${parts[0]}`.trim();
       if (reordered === n) return p;
     }
   }
 
-  // contains match
   for (const p of POOL) {
     const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
     if (aliases.some((a) => a.includes(n) || n.includes(a))) return p;
   }
 
-  // last-name fallback
   const words = n.split(" ");
   const last = words[words.length - 1];
   if (last && last.length >= 4) {
     for (const p of POOL) {
       const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
-      if (aliases.some((a) => {
-        const aliasWords = a.split(" ");
-        return aliasWords[aliasWords.length - 1] === last;
-      })) {
+      if (
+        aliases.some((a) => {
+          const aliasWords = a.split(" ");
+          return aliasWords[aliasWords.length - 1] === last;
+        })
+      ) {
         return p;
       }
     }
@@ -313,53 +331,52 @@ export default function MastersPool() {
       .sort((a, b) => b.payout - a.payout);
   }, [rows, prizes]);
 
-const refresh = useCallback(async () => {
-  setLoading(true);
-  setFetchError(null);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
 
-  try {
-    const data = await fetchESPN();
-    const map = {};
-    const unmatched = [];
+    try {
+      const data = await fetchESPN();
+      const map = {};
+      const unmatched = [];
 
-    for (const ap of data.players || []) {
-      const pool = matchPlayer(ap.name);
+      for (const ap of data.players || []) {
+        const pool = matchPlayer(ap.name);
+        if (!pool) {
+          unmatched.push(ap.name);
+          continue;
+        }
 
-      if (!pool) {
-        unmatched.push(ap.name);
-        continue;
+        map[pool[0]] = {
+          r1: ap.r1,
+          r2: ap.r2,
+          total: ap.total ?? ((ap.r1 ?? 0) + (ap.r2 ?? 0)),
+          thru: ap.thru ?? "–",
+        };
       }
 
-      map[pool[0]] = {
-        r1: ap.r1,
-        r2: ap.r2,
-        total: ap.total ?? ((ap.r1 ?? 0) + (ap.r2 ?? 0)),
-        thru: ap.thru ?? "–",
-      };
-    }
+      if (unmatched.length) {
+        console.log("Unmatched ESPN players:", unmatched);
+      }
 
-    if (unmatched.length) {
-      console.log("Unmatched ESPN players:", unmatched);
-    }
+      if (Object.keys(map).length > 0) {
+        setLiveMap(map);
+        setMeta({ round: data.round, status: data.status });
+      } else {
+        setMeta({ round: "Seeded Data", status: "No matching live players found" });
+      }
 
-    if (Object.keys(map).length > 0) {
-      setLiveMap(map);
-      setMeta({ round: data.round, status: data.status });
-    } else {
-      setMeta({ round: "Seeded Data", status: "No matching live players found" });
+      setLastUpdated(new Date());
+    } catch (e) {
+      setFetchError(e?.message || "Unknown error");
+      setMeta((prev) => ({
+        round: prev.round || "Seeded Data",
+        status: "Seeded Data",
+      }));
+    } finally {
+      setLoading(false);
     }
-
-    setLastUpdated(new Date());
-  } catch (e) {
-    setFetchError(e?.message || "Unknown error");
-    setMeta((prev) => ({
-      round: prev.round || "Seeded Data",
-      status: "Seeded Data",
-    }));
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -382,15 +399,21 @@ const refresh = useCallback(async () => {
   }, [rows]);
 
   const rowBg = (pos, i) =>
-    pos === 1 ? "#1a2a0a" : pos <= 3 ? "#0f1e14" : i % 2 === 0 ? "#0d1b2e" : "#0a1525";
+    pos === 1
+      ? "#1f5a3a"
+      : pos <= 3
+        ? "#174d33"
+        : i % 2 === 0
+          ? "#0f2a1d"
+          : "#0c2419";
 
   return (
     <div
       style={{
         fontFamily: "'Georgia', serif",
-        background: "#0a1628",
+        background: COLORS.bg,
         minHeight: "100vh",
-        color: "#e8e0d0",
+        color: COLORS.text,
         paddingBottom: 40,
       }}
     >
@@ -400,17 +423,17 @@ const refresh = useCallback(async () => {
         .tbl th {
           padding: 9px 10px;
           text-align: left;
-          border-bottom: 1px solid #1e3a2a;
-          color: #8aad8a;
+          border-bottom: 1px solid #1e4d36;
+          color: #9bb8a5;
           font-size: 11px;
           letter-spacing: .07em;
           text-transform: uppercase;
           font-weight: normal;
-          background: #081220;
+          background: #0d2419;
         }
         .tbl th.c, .tbl td.c { text-align: center; }
-        .tbl td { padding: 7px 10px; border-bottom: 1px solid #0f2030; }
-        .tbl tr:hover td { filter: brightness(1.08); }
+        .tbl td { padding: 7px 10px; border-bottom: 1px solid #163d2b; }
+        .tbl tr:hover td { filter: brightness(1.06); }
         .tag {
           display: inline-block;
           color: #fff;
@@ -423,8 +446,8 @@ const refresh = useCallback(async () => {
         }
         .btn {
           background: transparent;
-          border: 1px solid #c9a84c;
-          color: #c9a84c;
+          border: 1px solid #c8a951;
+          color: #c8a951;
           padding: 6px 14px;
           cursor: pointer;
           font-size: 11px;
@@ -432,14 +455,14 @@ const refresh = useCallback(async () => {
           font-family: inherit;
           text-transform: uppercase;
         }
-        .btn:hover { background: rgba(201,168,76,.12); }
+        .btn:hover { background: rgba(200,169,81,.15); }
         .btn:disabled { opacity: .5; cursor: default; }
       `}</style>
 
       <div
         style={{
-          background: "linear-gradient(135deg,#0a1628,#1a3a2a 50%,#0a1628)",
-          borderBottom: "2px solid #c9a84c",
+          background: `linear-gradient(135deg, ${COLORS.headerGrad1}, ${COLORS.headerGrad2} 50%, ${COLORS.headerGrad1})`,
+          borderBottom: `2px solid ${COLORS.gold}`,
           padding: "18px 24px 14px",
         }}
       >
@@ -456,7 +479,7 @@ const refresh = useCallback(async () => {
             <div
               style={{
                 fontSize: 11,
-                color: "#8aad8a",
+                color: COLORS.muted,
                 letterSpacing: ".1em",
                 textTransform: "uppercase",
                 marginBottom: 4,
@@ -468,7 +491,7 @@ const refresh = useCallback(async () => {
               style={{
                 fontSize: 22,
                 fontWeight: "bold",
-                color: "#c9a84c",
+                color: COLORS.gold,
                 letterSpacing: ".04em",
                 textTransform: "uppercase",
               }}
@@ -495,7 +518,7 @@ const refresh = useCallback(async () => {
             <span
               key={i}
               style={{
-                background: ["#2d5016", "#7b3308", "#5a1e8c"][i],
+                background: ["#1f5a3a", "#8c6b1f", "#2f6b4f"][i],
                 color: "#fff",
                 fontSize: 11,
                 fontWeight: "bold",
@@ -509,18 +532,18 @@ const refresh = useCallback(async () => {
           ))}
 
           {fetchError ? (
-            <span style={{ color: "#ff8080", fontSize: 11 }}>
+            <span style={{ color: COLORS.danger, fontSize: 11 }}>
               ESPN fetch failed ({fetchError}) — showing seeded data
             </span>
           ) : lastUpdated ? (
-            <span style={{ color: "#6b8f6b", fontSize: 11 }}>
+            <span style={{ color: COLORS.muted, fontSize: 11 }}>
               Live via ESPN — Updated {lastUpdated.toLocaleTimeString()} — refreshes every 3 min
             </span>
           ) : null}
         </div>
       </div>
 
-      <div style={{ display: "flex", borderBottom: "1px solid #1e3040", padding: "0 24px" }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 24px" }}>
         {[
           ["leaderboard", "Leaderboard"],
           ["teams", "Team Standings"],
@@ -537,10 +560,10 @@ const refresh = useCallback(async () => {
               textTransform: "uppercase",
               background: "none",
               border: "none",
-              borderBottom: tab === id ? "2px solid #c9a84c" : "2px solid transparent",
+              borderBottom: tab === id ? `2px solid ${COLORS.gold}` : "2px solid transparent",
               marginBottom: -1,
               fontFamily: "inherit",
-              color: tab === id ? "#c9a84c" : "#6b8080",
+              color: tab === id ? COLORS.gold : COLORS.muted,
             }}
           >
             {label}
@@ -576,7 +599,7 @@ const refresh = useCallback(async () => {
                       className="c"
                       style={{
                         background: bg,
-                        color: pos <= 3 ? "#c9a84c" : "#8aad8a",
+                        color: pos === 1 ? COLORS.gold : pos <= 3 ? COLORS.goldSoft : COLORS.muted,
                         fontWeight: "bold",
                         fontSize: 12,
                       }}
@@ -587,13 +610,13 @@ const refresh = useCallback(async () => {
                     <td
                       style={{
                         background: bg,
-                        color: pos <= 5 ? "#e8e0d0" : "#a0b8a0",
+                        color: pos <= 5 ? COLORS.text : "#bfd3c3",
                         fontWeight: pos <= 3 ? "bold" : "normal",
                       }}
                     >
                       {r.name}
                       {r.live && (
-                        <span style={{ color: "#5dba5d", fontSize: 10, marginLeft: 6 }}>
+                        <span style={{ color: COLORS.liveGreen, fontSize: 10, marginLeft: 6 }}>
                           LIVE
                         </span>
                       )}
@@ -601,7 +624,11 @@ const refresh = useCallback(async () => {
 
                     <td style={{ background: bg }}>
                       {r.ownership.map(([t, pct]) => (
-                        <span key={t} className="tag" style={{ background: TEAM_COLORS[t] || "#333" }}>
+                        <span
+                          key={t}
+                          className="tag"
+                          style={{ background: TEAM_COLORS[t] || "#333", opacity: 0.92 }}
+                        >
                           {t}
                           {pct < 1 ? ` ${Math.round(pct * 100)}%` : ""}
                         </span>
@@ -620,20 +647,20 @@ const refresh = useCallback(async () => {
                     >
                       {fmtScore(r.total)}
                     </td>
-                    <td className="c" style={{ background: bg, color: "#6b9080", fontSize: 12 }}>
+                    <td className="c" style={{ background: bg, color: COLORS.muted, fontSize: 12 }}>
                       {r.thru}
                     </td>
 
                     <td className="c" style={{ background: bg }}>
                       {prize > 0 ? (
-                        <span style={{ color: "#c9a84c", fontWeight: "bold" }}>
+                        <span style={{ color: COLORS.gold, fontWeight: "bold" }}>
                           {fmtMoney(prize)}
                           {isTie && pos > 1 && (
-                            <span style={{ color: "#8aad8a", fontSize: 10 }}> /{tieCount}</span>
+                            <span style={{ color: COLORS.muted, fontSize: 10 }}> /{tieCount}</span>
                           )}
                         </span>
                       ) : (
-                        <span style={{ color: "#3a5040" }}>--</span>
+                        <span style={{ color: COLORS.empty }}>--</span>
                       )}
                     </td>
 
@@ -642,11 +669,11 @@ const refresh = useCallback(async () => {
                         r.ownership.map(([t, pct]) => (
                           <span key={t} style={{ display: "inline-block", marginRight: 8, fontSize: 12 }}>
                             <span style={{ color: TEAM_COLORS[t] || "#fff", fontWeight: "bold" }}>{t}</span>
-                            <span style={{ color: "#8aad8a" }}> {fmtMoney(prize * pct)}</span>
+                            <span style={{ color: COLORS.muted }}> {fmtMoney(prize * pct)}</span>
                           </span>
                         ))
                       ) : (
-                        <span style={{ color: "#3a5040" }}>--</span>
+                        <span style={{ color: COLORS.empty }}>--</span>
                       )}
                     </td>
                   </tr>
@@ -673,14 +700,14 @@ const refresh = useCallback(async () => {
               {teamStandings.map((t, i) => {
                 const bg =
                   i === 0
-                    ? "#1a2a0a"
+                    ? "#1f5a3a"
                     : i === 1
-                      ? "#0f1e14"
+                      ? "#174d33"
                       : i === 2
-                        ? "#12161a"
+                        ? "#123524"
                         : i % 2 === 0
-                          ? "#0d1b2e"
-                          : "#0a1525";
+                          ? "#0f2a1d"
+                          : "#0c2419";
 
                 return (
                   <tr key={t.team}>
@@ -688,7 +715,7 @@ const refresh = useCallback(async () => {
                       className="c"
                       style={{
                         background: bg,
-                        color: i < 3 ? "#c9a84c" : "#8aad8a",
+                        color: i === 0 ? COLORS.gold : i < 3 ? COLORS.goldSoft : COLORS.muted,
                         fontWeight: "bold",
                         fontSize: i < 3 ? 16 : 13,
                       }}
@@ -701,6 +728,7 @@ const refresh = useCallback(async () => {
                         className="tag"
                         style={{
                           background: TEAM_COLORS[t.team] || "#333",
+                          opacity: 0.92,
                           fontSize: 13,
                           padding: "4px 10px",
                         }}
@@ -709,11 +737,11 @@ const refresh = useCallback(async () => {
                       </span>
                     </td>
 
-                    <td className="c" style={{ background: bg, color: "#8aad8a" }}>
+                    <td className="c" style={{ background: bg, color: COLORS.muted }}>
                       {fmtMoney(t.bid).replace(".00", "")}
                     </td>
 
-                    <td style={{ background: bg, color: "#c8d8b8" }}>
+                    <td style={{ background: bg, color: "#d7e5d8" }}>
                       {t.best ? (
                         <>
                           {t.best}{" "}
@@ -728,7 +756,7 @@ const refresh = useCallback(async () => {
                       className="c"
                       style={{
                         background: bg,
-                        color: t.earners > 0 ? "#c9a84c" : "#3a5040",
+                        color: t.earners > 0 ? COLORS.gold : COLORS.empty,
                         fontWeight: "bold",
                       }}
                     >
@@ -738,7 +766,7 @@ const refresh = useCallback(async () => {
                     <td className="c" style={{ background: bg }}>
                       <strong
                         style={{
-                          color: t.payout > t.bid ? "#5dba5d" : t.payout > 0 ? "#c9a84c" : "#3a5040",
+                          color: t.payout > t.bid ? COLORS.positive : t.payout > 0 ? COLORS.gold : COLORS.empty,
                           fontSize: 14,
                         }}
                       >
@@ -751,7 +779,7 @@ const refresh = useCallback(async () => {
                       style={{
                         background: bg,
                         fontWeight: "bold",
-                        color: t.roi >= 0 ? "#5dba5d" : "#e05050",
+                        color: t.roi >= 0 ? COLORS.positive : COLORS.negative,
                       }}
                     >
                       {t.payout > 0 ? `${t.roi >= 0 ? "+" : ""}${(t.roi * 100).toFixed(1)}%` : "--"}
@@ -767,16 +795,16 @@ const refresh = useCallback(async () => {
           <div style={{ maxWidth: 480, paddingTop: 12 }}>
             <div
               style={{
-                background: "#0f1e14",
-                border: "1px solid #2d5016",
+                background: COLORS.panel,
+                border: `1px solid ${COLORS.border}`,
                 padding: "10px 16px",
                 marginBottom: 14,
                 fontSize: 12,
-                color: "#8aad8a",
+                color: COLORS.muted,
                 borderRadius: 2,
               }}
             >
-              <strong style={{ color: "#c9a84c" }}>Tie Rule: </strong>
+              <strong style={{ color: COLORS.gold }}>Tie Rule: </strong>
               Positions 2-20 pool their prizes and split equally. Position 1 always pays full{" "}
               {fmtMoney(BASE_PAYOUTS[0])}. Total distributed = $146,454.
             </div>
@@ -792,7 +820,7 @@ const refresh = useCallback(async () => {
                 {BASE_PAYOUTS.map((amt, i) => {
                   const pos = i + 1;
                   const suf = { 1: "st", 2: "nd", 3: "rd" }[pos] || "th";
-                  const bg = pos <= 3 ? "#1a2a0a" : i % 2 === 0 ? "#0d1b2e" : "#0a1525";
+                  const bg = pos <= 3 ? "#174d33" : i % 2 === 0 ? "#0f2a1d" : "#0c2419";
 
                   return (
                     <tr key={pos}>
@@ -800,7 +828,7 @@ const refresh = useCallback(async () => {
                         className="c"
                         style={{
                           background: bg,
-                          color: pos <= 3 ? "#c9a84c" : "#8aad8a",
+                          color: pos <= 3 ? COLORS.gold : COLORS.muted,
                           fontWeight: pos <= 3 ? "bold" : "normal",
                         }}
                       >
@@ -811,7 +839,7 @@ const refresh = useCallback(async () => {
                         className="c"
                         style={{
                           background: bg,
-                          color: pos <= 3 ? "#c9a84c" : "#a0b8a0",
+                          color: pos <= 3 ? COLORS.gold : "#bfd3c3",
                           fontWeight: pos <= 3 ? "bold" : "normal",
                         }}
                       >
