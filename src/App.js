@@ -28,7 +28,6 @@ const TEAM_COLORS = {
 const COLORS = {
   pageBg: "#ffffff",
   boardBg: "#fffdf7",
-  boardAlt: "#fbf8ef",
   boardTop: "#1c5a38",
   boardTopDark: "#15492d",
   mastersGreen: "#1f5e3b",
@@ -153,33 +152,53 @@ function matchPlayer(name) {
 
     return {
       original: p,
-      display,
-      reordered,
       aliases: [...new Set([...aliases, reordered])],
     };
   });
 
-  // 1. exact alias/full-name match
   for (const p of normalizedPool) {
     if (p.aliases.includes(n)) return p.original;
   }
 
-  // 2. exact last-name + first-name containment
   for (const p of normalizedPool) {
     if (p.aliases.some((a) => a.includes(n) || n.includes(a))) return p.original;
   }
 
-  // 3. last-name fallback only as a last resort
   const last = n.split(" ").pop();
   if (last && last.length >= 4) {
     const candidates = normalizedPool.filter((p) =>
       p.aliases.some((a) => a.split(" ").pop() === last)
     );
-
     if (candidates.length === 1) return candidates[0].original;
   }
 
   return null;
+}
+
+function normalizePlayerScores(r1, r2, total, displayName = "") {
+  const hasR1 = r1 !== null && r1 !== undefined;
+  const hasR2 = r2 !== null && r2 !== undefined;
+  const hasTotal = total !== null && total !== undefined;
+
+  if (hasR1 && hasR2) {
+    const computed = r1 + r2;
+    if (hasTotal && computed !== total) {
+      console.log("Score mismatch detected:", {
+        player: displayName,
+        r1,
+        r2,
+        espnTotal: total,
+        computedTotal: computed,
+      });
+    }
+    return { r1, r2, total: computed };
+  }
+
+  return {
+    r1: hasR1 ? r1 : null,
+    r2: hasR2 ? r2 : null,
+    total: hasTotal ? total : 0,
+  };
 }
 
 function computePayouts(sorted) {
@@ -196,16 +215,12 @@ function computePayouts(sorted) {
     const startPos = grpStart + 1;
 
     if (startPos === 1) {
-      for (let k = grpStart; k < grpStart + n; k++) {
-        prizes[k] = BASE_PAYOUTS[0];
-      }
+      for (let k = grpStart; k < grpStart + n; k++) prizes[k] = BASE_PAYOUTS[0];
     } else {
       const paying = Array.from({ length: n }, (_, k) => startPos + k).filter((p) => p <= 20);
       const pool = paying.reduce((sum, p) => sum + BASE_PAYOUTS[p - 1], 0);
       const split = n > 0 ? pool / n : 0;
-      for (let k = grpStart; k < grpStart + n; k++) {
-        prizes[k] = split;
-      }
+      for (let k = grpStart; k < grpStart + n; k++) prizes[k] = split;
     }
   }
 
@@ -225,7 +240,7 @@ function buildRows(liveMap) {
       r1,
       r2,
       total,
-      thru: live?.thru ?? (p[4] !== null ? (p[0] === "Clark, Wyndham" ? "F" : "*" ) : "–"),
+      thru: live?.thru ?? (p[4] !== null ? (p[0] === "Clark, Wyndham" ? "F" : "*") : "–"),
       live: !!live,
     };
   }).sort((a, b) => {
@@ -348,16 +363,27 @@ export default function MastersPool() {
           continue;
         }
 
+        const normalized = normalizePlayerScores(
+          ap.r1 ?? null,
+          ap.r2 ?? null,
+          ap.total ?? null,
+          pool[0]
+        );
+
         map[pool[0]] = {
-          r1: ap.r1,
-          r2: ap.r2,
-          total: ap.total ?? ((ap.r1 ?? 0) + (ap.r2 ?? 0)),
+          r1: normalized.r1,
+          r2: normalized.r2,
+          total: normalized.total,
           thru: ap.thru ?? "–",
         };
       }
 
       if (unmatched.length) {
         console.log("Unmatched ESPN players:", unmatched);
+      }
+
+      if (map["Hojgaard, Rasmus"]) {
+        console.log("Hojgaard mapped score:", map["Hojgaard, Rasmus"]);
       }
 
       if (Object.keys(map).length > 0) {
@@ -400,22 +426,10 @@ export default function MastersPool() {
   }, [rows]);
 
   const leaderboardRowBg = (pos, i) =>
-    pos === 1
-      ? "#f7f1da"
-      : pos <= 3
-        ? "#fbf7ea"
-        : i % 2 === 0
-          ? "#fffdf7"
-          : "#fcfaf2";
+    pos === 1 ? "#f7f1da" : pos <= 3 ? "#fbf7ea" : i % 2 === 0 ? "#fffdf7" : "#fcfaf2";
 
   const teamRowBg = (i) =>
-    i === 0
-      ? "#f7f1da"
-      : i === 1
-        ? "#fbf7ea"
-        : i % 2 === 0
-          ? "#fffdf7"
-          : "#fcfaf2";
+    i === 0 ? "#f7f1da" : i === 1 ? "#fbf7ea" : i % 2 === 0 ? "#fffdf7" : "#fcfaf2";
 
   return (
     <div
@@ -439,10 +453,7 @@ export default function MastersPool() {
         <style>{`
           * { box-sizing: border-box; }
           .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-          .tbl th,
-          .tbl td {
-            border: 1px solid ${COLORS.grid};
-          }
+          .tbl th, .tbl td { border: 1px solid ${COLORS.grid}; }
           .tbl th {
             padding: 8px 8px;
             text-align: left;
@@ -483,13 +494,8 @@ export default function MastersPool() {
             text-transform: uppercase;
             font-weight: 700;
           }
-          .btn:hover {
-            background: #f1ead8;
-          }
-          .btn:disabled {
-            opacity: .5;
-            cursor: default;
-          }
+          .btn:hover { background: #f1ead8; }
+          .btn:disabled { opacity: .5; cursor: default; }
         `}</style>
 
         <div
@@ -700,16 +706,10 @@ export default function MastersPool() {
                         ))}
                       </td>
 
-                      <td
-                        className="c"
-                        style={{ background: bg, color: scoreColor(r.r1), fontWeight: 900 }}
-                      >
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r1), fontWeight: 900 }}>
                         {fmtScore(r.r1)}
                       </td>
-                      <td
-                        className="c"
-                        style={{ background: bg, color: scoreColor(r.r2), fontWeight: 900 }}
-                      >
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r2), fontWeight: 900 }}>
                         {r.r2 != null ? fmtScore(r.r2) : "--"}
                       </td>
                       <td
@@ -723,10 +723,7 @@ export default function MastersPool() {
                       >
                         {fmtScore(r.total)}
                       </td>
-                      <td
-                        className="c"
-                        style={{ background: bg, color: "#111111", fontWeight: 700 }}
-                      >
+                      <td className="c" style={{ background: bg, color: "#111111", fontWeight: 700 }}>
                         {r.thru}
                       </td>
 
@@ -747,12 +744,8 @@ export default function MastersPool() {
                         {prize > 0 ? (
                           r.ownership.map(([t, pct]) => (
                             <span key={t} style={{ display: "inline-block", marginRight: 10, fontSize: 12 }}>
-                              <span style={{ color: TEAM_COLORS[t] || "#111", fontWeight: 900 }}>
-                                {t}
-                              </span>
-                              <span style={{ color: "#111", fontWeight: 700 }}>
-                                {" "}{fmtMoney(prize * pct)}
-                              </span>
+                              <span style={{ color: TEAM_COLORS[t] || "#111", fontWeight: 900 }}>{t}</span>
+                              <span style={{ color: "#111", fontWeight: 700 }}> {fmtMoney(prize * pct)}</span>
                             </span>
                           ))
                         ) : (
