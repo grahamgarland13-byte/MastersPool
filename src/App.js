@@ -108,10 +108,14 @@ function parseScore(value) {
 
 function normalizeName(name) {
   return String(name || "")
-    .toLowerCase()
+    .normalize("NFD")                 // split accented chars
+    .replace(/[\u0300-\u036f]/g, "")  // remove accents/diacritics
     .replace(/\./g, "")
     .replace(/,/g, "")
+    .replace(/'/g, "")
+    .replace(/-/g, " ")
     .replace(/\s+/g, " ")
+    .toLowerCase()
     .trim();
 }
 
@@ -119,16 +123,40 @@ function matchPlayer(name) {
   const n = normalizeName(name);
   if (!n) return null;
 
+  // exact alias match first
   for (const p of POOL) {
-    const aliases = p[2].map(normalizeName);
-    if (aliases.some((a) => n === a || n.includes(a) || a.includes(n))) return p;
+    const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
+    if (aliases.includes(n)) return p;
   }
 
-  const last = n.split(" ").pop();
+  // exact reordered-name match
+  for (const p of POOL) {
+    const display = normalizeName(p[0]); // e.g. "hogaard rasmus"
+    const parts = display.split(" ");
+    if (parts.length >= 2) {
+      const reordered = `${parts.slice(1).join(" ")} ${parts[0]}`.trim(); // "rasmus hogaard"
+      if (reordered === n) return p;
+    }
+  }
+
+  // contains match
+  for (const p of POOL) {
+    const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
+    if (aliases.some((a) => a.includes(n) || n.includes(a))) return p;
+  }
+
+  // last-name fallback
+  const words = n.split(" ");
+  const last = words[words.length - 1];
   if (last && last.length >= 4) {
     for (const p of POOL) {
-      const aliases = p[2].map(normalizeName);
-      if (aliases.some((a) => a === last || a.endsWith(" " + last))) return p;
+      const aliases = [p[0], ...(p[2] || [])].map(normalizeName);
+      if (aliases.some((a) => {
+        const aliasWords = a.split(" ");
+        return aliasWords[aliasWords.length - 1] === last;
+      })) {
+        return p;
+      }
     }
   }
 
