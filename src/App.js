@@ -14,35 +14,35 @@ const TEAM_BIDS = {
 };
 
 const TEAM_COLORS = {
-  KING: "#1f4e79",
-  HOCH: "#2f6f3e",
-  MALLOY: "#8b5a2b",
-  KRAHN: "#5b3c88",
-  GUTSCHOW: "#7a4a21",
-  BARRY: "#a13d2d",
-  VERCHOTTA: "#2b6f77",
-  ORR: "#4a4a4a",
-  BAR: "#2d7a78",
+  KING: "#2f5d8a",
+  HOCH: "#3d6f48",
+  MALLOY: "#8a5a34",
+  KRAHN: "#6a4c93",
+  GUTSCHOW: "#8b5a2b",
+  BARRY: "#a14d3f",
+  VERCHOTTA: "#3e7c85",
+  ORR: "#666666",
+  BAR: "#3d7f7b",
 };
 
 const COLORS = {
-  bg: "#0b1f14",
-  panel: "#0f2a1d",
-  panelAlt: "#123524",
-  headerGrad1: "#0b1f14",
-  headerGrad2: "#1f5a3a",
+  bg: "#ffffff",
+  panel: "#f7f3e8",
+  panelAlt: "#f1ecdc",
+  headerGrad1: "#1b5e3b",
+  headerGrad2: "#2e7d50",
   gold: "#c8a951",
   goldSoft: "#d8c27a",
-  text: "#f5f1e6",
-  muted: "#9bb8a5",
-  border: "#1e4d36",
-  hover: "#163d2b",
-  liveGreen: "#6bcf8f",
-  danger: "#ff9a9a",
-  positive: "#6bcf8f",
-  negative: "#ff7a7a",
-  even: "#d8c27a",
-  empty: "#486353",
+  text: "#1f2f24",
+  muted: "#6d7f72",
+  border: "#d9cfb3",
+  hover: "#f3eedf",
+  liveGreen: "#2f9e5b",
+  danger: "#c94b4b",
+  positive: "#2f9e5b",
+  negative: "#c94b4b",
+  even: "#b69539",
+  empty: "#9aa79c",
 };
 
 // [displayName, [[team,pct],...], [aliases], r1_seed, r2_seed]
@@ -400,458 +400,486 @@ export default function MastersPool() {
 
   const rowBg = (pos, i) =>
     pos === 1
-      ? "#1f5a3a"
+      ? "#f3ecd3"
       : pos <= 3
-        ? "#174d33"
+        ? "#f7f3e3"
         : i % 2 === 0
-          ? "#0f2a1d"
-          : "#0c2419";
+          ? "#fffdf7"
+          : "#fbf8ef";
 
   return (
     <div
       style={{
         fontFamily: "'Georgia', serif",
-        background: COLORS.bg,
+        background: "#ffffff",
         minHeight: "100vh",
         color: COLORS.text,
-        paddingBottom: 40,
+        padding: "24px 0 40px",
       }}
     >
-      <style>{`
-        * { box-sizing: border-box; }
-        .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .tbl th {
-          padding: 9px 10px;
-          text-align: left;
-          border-bottom: 1px solid #1e4d36;
-          color: #9bb8a5;
-          font-size: 11px;
-          letter-spacing: .07em;
-          text-transform: uppercase;
-          font-weight: normal;
-          background: #0d2419;
-        }
-        .tbl th.c, .tbl td.c { text-align: center; }
-        .tbl td { padding: 7px 10px; border-bottom: 1px solid #163d2b; }
-        .tbl tr:hover td { filter: brightness(1.06); }
-        .tag {
-          display: inline-block;
-          color: #fff;
-          font-size: 10px;
-          padding: 2px 6px;
-          border-radius: 2px;
-          margin-right: 3px;
-          letter-spacing: .03em;
-          margin-bottom: 3px;
-        }
-        .btn {
-          background: transparent;
-          border: 1px solid #c8a951;
-          color: #c8a951;
-          padding: 6px 14px;
-          cursor: pointer;
-          font-size: 11px;
-          letter-spacing: .06em;
-          font-family: inherit;
-          text-transform: uppercase;
-        }
-        .btn:hover { background: rgba(200,169,81,.15); }
-        .btn:disabled { opacity: .5; cursor: default; }
-      `}</style>
-
       <div
         style={{
-          background: `linear-gradient(135deg, ${COLORS.headerGrad1}, ${COLORS.headerGrad2} 50%, ${COLORS.headerGrad1})`,
-          borderBottom: `2px solid ${COLORS.gold}`,
-          padding: "18px 24px 14px",
+          maxWidth: 1180,
+          margin: "0 auto",
+          background: "#fdfbf4",
+          border: `1px solid ${COLORS.border}`,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
         }}
       >
+        <style>{`
+          * { box-sizing: border-box; }
+          .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+          .tbl th {
+            padding: 10px 10px;
+            text-align: left;
+            border-bottom: 1px solid #d9cfb3;
+            color: #5f705f;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #f3eedf;
+          }
+          .tbl th.c, .tbl td.c { text-align: center; }
+          .tbl td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #ece5d2;
+            background: #fffdf7;
+          }
+          .tbl tr:hover td { background: #f8f4e8; }
+          .tag {
+            display: inline-block;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            margin-right: 3px;
+            letter-spacing: .03em;
+            margin-bottom: 3px;
+          }
+          .btn {
+            background: #ffffff;
+            border: 1px solid #c8a951;
+            color: #1b5e3b;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 11px;
+            letter-spacing: .06em;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-weight: bold;
+          }
+          .btn:hover {
+            background: #f7f3e8;
+          }
+          .btn:disabled {
+            opacity: .5;
+            cursor: default;
+          }
+        `}</style>
+
         <div
           style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 8,
-            flexWrap: "wrap",
+            background: `linear-gradient(180deg, ${COLORS.headerGrad1}, ${COLORS.headerGrad2})`,
+            borderBottom: `4px solid ${COLORS.gold}`,
+            padding: "18px 24px 14px",
           }}
         >
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                color: COLORS.muted,
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Augusta National - 2026
-            </div>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: "bold",
-                color: COLORS.gold,
-                letterSpacing: ".04em",
-                textTransform: "uppercase",
-              }}
-            >
-              Masters Pool Tracker
-            </div>
-          </div>
-
-          <button className="btn" onClick={refresh} disabled={loading}>
-            {loading ? "Fetching..." : "Refresh"}
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            marginTop: 10,
-            alignItems: "center",
-          }}
-        >
-          {[meta.round, meta.status, "Ties split pool (excl. 1st)"].map((lbl, i) => (
-            <span
-              key={i}
-              style={{
-                background: ["#1f5a3a", "#8c6b1f", "#2f6b4f"][i],
-                color: "#fff",
-                fontSize: 11,
-                fontWeight: "bold",
-                padding: "3px 10px",
-                borderRadius: 2,
-                letterSpacing: ".05em",
-              }}
-            >
-              {lbl}
-            </span>
-          ))}
-
-          {fetchError ? (
-            <span style={{ color: COLORS.danger, fontSize: 11 }}>
-              ESPN fetch failed ({fetchError}) — showing seeded data
-            </span>
-          ) : lastUpdated ? (
-            <span style={{ color: COLORS.muted, fontSize: 11 }}>
-              Live via ESPN — Updated {lastUpdated.toLocaleTimeString()} — refreshes every 3 min
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 24px" }}>
-        {[
-          ["leaderboard", "Leaderboard"],
-          ["teams", "Team Standings"],
-          ["payouts", "Payout Table"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
+          <div
             style={{
-              padding: "11px 18px",
-              cursor: "pointer",
-              fontSize: 12,
-              letterSpacing: ".07em",
-              textTransform: "uppercase",
-              background: "none",
-              border: "none",
-              borderBottom: tab === id ? `2px solid ${COLORS.gold}` : "2px solid transparent",
-              marginBottom: -1,
-              fontFamily: "inherit",
-              color: tab === id ? COLORS.gold : COLORS.muted,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              flexWrap: "wrap",
             }}
           >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ padding: "8px 24px 0" }}>
-        {tab === "leaderboard" && (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th className="c">Pos</th>
-                <th>Player</th>
-                <th>Team(s)</th>
-                <th className="c">R1</th>
-                <th className="c">R2</th>
-                <th className="c">Total</th>
-                <th className="c">Thru</th>
-                <th className="c">Proj. Prize</th>
-                <th>Team Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const { pos, isTie, tieCount } = posInfo[i];
-                const prize = prizes[i];
-                const bg = rowBg(pos, i);
-
-                return (
-                  <tr key={r.name}>
-                    <td
-                      className="c"
-                      style={{
-                        background: bg,
-                        color: pos === 1 ? COLORS.gold : pos <= 3 ? COLORS.goldSoft : COLORS.muted,
-                        fontWeight: "bold",
-                        fontSize: 12,
-                      }}
-                    >
-                      {(isTie ? "T" : "") + pos}
-                    </td>
-
-                    <td
-                      style={{
-                        background: bg,
-                        color: pos <= 5 ? COLORS.text : "#bfd3c3",
-                        fontWeight: pos <= 3 ? "bold" : "normal",
-                      }}
-                    >
-                      {r.name}
-                      {r.live && (
-                        <span style={{ color: COLORS.liveGreen, fontSize: 10, marginLeft: 6 }}>
-                          LIVE
-                        </span>
-                      )}
-                    </td>
-
-                    <td style={{ background: bg }}>
-                      {r.ownership.map(([t, pct]) => (
-                        <span
-                          key={t}
-                          className="tag"
-                          style={{ background: TEAM_COLORS[t] || "#333", opacity: 0.92 }}
-                        >
-                          {t}
-                          {pct < 1 ? ` ${Math.round(pct * 100)}%` : ""}
-                        </span>
-                      ))}
-                    </td>
-
-                    <td className="c" style={{ background: bg, color: scoreColor(r.r1), fontWeight: "bold" }}>
-                      {fmtScore(r.r1)}
-                    </td>
-                    <td className="c" style={{ background: bg, color: scoreColor(r.r2), fontWeight: "bold" }}>
-                      {r.r2 != null ? fmtScore(r.r2) : "--"}
-                    </td>
-                    <td
-                      className="c"
-                      style={{ background: bg, color: scoreColor(r.total), fontWeight: "bold", fontSize: 14 }}
-                    >
-                      {fmtScore(r.total)}
-                    </td>
-                    <td className="c" style={{ background: bg, color: COLORS.muted, fontSize: 12 }}>
-                      {r.thru}
-                    </td>
-
-                    <td className="c" style={{ background: bg }}>
-                      {prize > 0 ? (
-                        <span style={{ color: COLORS.gold, fontWeight: "bold" }}>
-                          {fmtMoney(prize)}
-                          {isTie && pos > 1 && (
-                            <span style={{ color: COLORS.muted, fontSize: 10 }}> /{tieCount}</span>
-                          )}
-                        </span>
-                      ) : (
-                        <span style={{ color: COLORS.empty }}>--</span>
-                      )}
-                    </td>
-
-                    <td style={{ background: bg }}>
-                      {prize > 0 ? (
-                        r.ownership.map(([t, pct]) => (
-                          <span key={t} style={{ display: "inline-block", marginRight: 8, fontSize: 12 }}>
-                            <span style={{ color: TEAM_COLORS[t] || "#fff", fontWeight: "bold" }}>{t}</span>
-                            <span style={{ color: COLORS.muted }}> {fmtMoney(prize * pct)}</span>
-                          </span>
-                        ))
-                      ) : (
-                        <span style={{ color: COLORS.empty }}>--</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {tab === "teams" && (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th className="c">Rank</th>
-                <th>Team</th>
-                <th className="c">Bid</th>
-                <th>Best Player</th>
-                <th className="c">Earners</th>
-                <th className="c">Proj. Payout</th>
-                <th className="c">ROI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {teamStandings.map((t, i) => {
-                const bg =
-                  i === 0
-                    ? "#1f5a3a"
-                    : i === 1
-                      ? "#174d33"
-                      : i === 2
-                        ? "#123524"
-                        : i % 2 === 0
-                          ? "#0f2a1d"
-                          : "#0c2419";
-
-                return (
-                  <tr key={t.team}>
-                    <td
-                      className="c"
-                      style={{
-                        background: bg,
-                        color: i === 0 ? COLORS.gold : i < 3 ? COLORS.goldSoft : COLORS.muted,
-                        fontWeight: "bold",
-                        fontSize: i < 3 ? 16 : 13,
-                      }}
-                    >
-                      {i + 1}
-                    </td>
-
-                    <td style={{ background: bg }}>
-                      <span
-                        className="tag"
-                        style={{
-                          background: TEAM_COLORS[t.team] || "#333",
-                          opacity: 0.92,
-                          fontSize: 13,
-                          padding: "4px 10px",
-                        }}
-                      >
-                        {t.team}
-                      </span>
-                    </td>
-
-                    <td className="c" style={{ background: bg, color: COLORS.muted }}>
-                      {fmtMoney(t.bid).replace(".00", "")}
-                    </td>
-
-                    <td style={{ background: bg, color: "#d7e5d8" }}>
-                      {t.best ? (
-                        <>
-                          {t.best}{" "}
-                          <span style={{ color: scoreColor(t.bestScore) }}>{fmtScore(t.bestScore)}</span>
-                        </>
-                      ) : (
-                        "--"
-                      )}
-                    </td>
-
-                    <td
-                      className="c"
-                      style={{
-                        background: bg,
-                        color: t.earners > 0 ? COLORS.gold : COLORS.empty,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {t.earners}
-                    </td>
-
-                    <td className="c" style={{ background: bg }}>
-                      <strong
-                        style={{
-                          color: t.payout > t.bid ? COLORS.positive : t.payout > 0 ? COLORS.gold : COLORS.empty,
-                          fontSize: 14,
-                        }}
-                      >
-                        {t.payout > 0 ? fmtMoney(t.payout) : "--"}
-                      </strong>
-                    </td>
-
-                    <td
-                      className="c"
-                      style={{
-                        background: bg,
-                        fontWeight: "bold",
-                        color: t.roi >= 0 ? COLORS.positive : COLORS.negative,
-                      }}
-                    >
-                      {t.payout > 0 ? `${t.roi >= 0 ? "+" : ""}${(t.roi * 100).toFixed(1)}%` : "--"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {tab === "payouts" && (
-          <div style={{ maxWidth: 480, paddingTop: 12 }}>
-            <div
-              style={{
-                background: COLORS.panel,
-                border: `1px solid ${COLORS.border}`,
-                padding: "10px 16px",
-                marginBottom: 14,
-                fontSize: 12,
-                color: COLORS.muted,
-                borderRadius: 2,
-              }}
-            >
-              <strong style={{ color: COLORS.gold }}>Tie Rule: </strong>
-              Positions 2-20 pool their prizes and split equally. Position 1 always pays full{" "}
-              {fmtMoney(BASE_PAYOUTS[0])}. Total distributed = $146,454.
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#dfe8df",
+                  letterSpacing: ".1em",
+                  textTransform: "uppercase",
+                  marginBottom: 4,
+                }}
+              >
+                Augusta National - 2026
+              </div>
+              <div
+                style={{
+                  fontSize: 24,
+                  fontWeight: "bold",
+                  color: "#ffffff",
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Masters Pool Tracker
+              </div>
             </div>
 
+            <button className="btn" onClick={refresh} disabled={loading}>
+              {loading ? "Fetching..." : "Refresh"}
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 10,
+              alignItems: "center",
+            }}
+          >
+            {[meta.round, meta.status, "Ties split pool (excl. 1st)"].map((lbl, i) => (
+              <span
+                key={i}
+                style={{
+                  background: ["#245f3e", "#b08d33", "#3f7a58"][i],
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  padding: "3px 10px",
+                  borderRadius: 2,
+                  letterSpacing: ".05em",
+                }}
+              >
+                {lbl}
+              </span>
+            ))}
+
+            {fetchError ? (
+              <span style={{ color: "#ffe0e0", fontSize: 11 }}>
+                ESPN fetch failed ({fetchError}) — showing seeded data
+              </span>
+            ) : lastUpdated ? (
+              <span style={{ color: "#e8f0e8", fontSize: 11 }}>
+                Live via ESPN — Updated {lastUpdated.toLocaleTimeString()} — refreshes every 3 min
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            borderBottom: `1px solid ${COLORS.border}`,
+            padding: "0 24px",
+            background: "#f7f3e8",
+          }}
+        >
+          {[
+            ["leaderboard", "Leaderboard"],
+            ["teams", "Team Standings"],
+            ["payouts", "Payout Table"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                padding: "11px 18px",
+                cursor: "pointer",
+                fontSize: 12,
+                letterSpacing: ".07em",
+                textTransform: "uppercase",
+                background: "none",
+                border: "none",
+                borderBottom: tab === id ? `3px solid ${COLORS.gold}` : "3px solid transparent",
+                marginBottom: -1,
+                fontFamily: "inherit",
+                fontWeight: "bold",
+                color: tab === id ? "#1b5e3b" : COLORS.muted,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: "14px 24px 20px" }}>
+          {tab === "leaderboard" && (
             <table className="tbl">
               <thead>
                 <tr>
-                  <th className="c">Place</th>
-                  <th className="c">Base Prize</th>
+                  <th className="c">Pos</th>
+                  <th>Player</th>
+                  <th>Team(s)</th>
+                  <th className="c">R1</th>
+                  <th className="c">R2</th>
+                  <th className="c">Total</th>
+                  <th className="c">Thru</th>
+                  <th className="c">Proj. Prize</th>
+                  <th>Team Share</th>
                 </tr>
               </thead>
               <tbody>
-                {BASE_PAYOUTS.map((amt, i) => {
-                  const pos = i + 1;
-                  const suf = { 1: "st", 2: "nd", 3: "rd" }[pos] || "th";
-                  const bg = pos <= 3 ? "#174d33" : i % 2 === 0 ? "#0f2a1d" : "#0c2419";
+                {rows.map((r, i) => {
+                  const { pos, isTie, tieCount } = posInfo[i];
+                  const prize = prizes[i];
+                  const bg = rowBg(pos, i);
 
                   return (
-                    <tr key={pos}>
+                    <tr key={r.name}>
                       <td
                         className="c"
                         style={{
                           background: bg,
-                          color: pos <= 3 ? COLORS.gold : COLORS.muted,
+                          color: pos === 1 ? "#1b5e3b" : pos <= 3 ? COLORS.gold : COLORS.muted,
+                          fontWeight: "bold",
+                          fontSize: 12,
+                        }}
+                      >
+                        {(isTie ? "T" : "") + pos}
+                      </td>
+
+                      <td
+                        style={{
+                          background: bg,
+                          color: "#1f2f24",
                           fontWeight: pos <= 3 ? "bold" : "normal",
                         }}
                       >
-                        {pos}
-                        {suf}
+                        {r.name}
+                        {r.live && (
+                          <span style={{ color: COLORS.liveGreen, fontSize: 10, marginLeft: 6 }}>
+                            LIVE
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        {r.ownership.map(([t, pct]) => (
+                          <span
+                            key={t}
+                            className="tag"
+                            style={{ background: TEAM_COLORS[t] || "#333", opacity: 0.92 }}
+                          >
+                            {t}
+                            {pct < 1 ? ` ${Math.round(pct * 100)}%` : ""}
+                          </span>
+                        ))}
+                      </td>
+
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r1), fontWeight: "bold" }}>
+                        {fmtScore(r.r1)}
+                      </td>
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r2), fontWeight: "bold" }}>
+                        {r.r2 != null ? fmtScore(r.r2) : "--"}
                       </td>
                       <td
                         className="c"
-                        style={{
-                          background: bg,
-                          color: pos <= 3 ? COLORS.gold : "#bfd3c3",
-                          fontWeight: pos <= 3 ? "bold" : "normal",
-                        }}
+                        style={{ background: bg, color: scoreColor(r.total), fontWeight: "bold", fontSize: 14 }}
                       >
-                        {fmtMoney(amt)}
+                        {fmtScore(r.total)}
+                      </td>
+                      <td className="c" style={{ background: bg, color: COLORS.muted, fontSize: 12 }}>
+                        {r.thru}
+                      </td>
+
+                      <td className="c" style={{ background: bg }}>
+                        {prize > 0 ? (
+                          <span style={{ color: COLORS.gold, fontWeight: "bold" }}>
+                            {fmtMoney(prize)}
+                            {isTie && pos > 1 && (
+                              <span style={{ color: COLORS.muted, fontSize: 10 }}> /{tieCount}</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span style={{ color: COLORS.empty }}>--</span>
+                        )}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        {prize > 0 ? (
+                          r.ownership.map(([t, pct]) => (
+                            <span key={t} style={{ display: "inline-block", marginRight: 8, fontSize: 12 }}>
+                              <span style={{ color: TEAM_COLORS[t] || "#fff", fontWeight: "bold" }}>{t}</span>
+                              <span style={{ color: COLORS.muted }}> {fmtMoney(prize * pct)}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ color: COLORS.empty }}>--</span>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+
+          {tab === "teams" && (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th className="c">Rank</th>
+                  <th>Team</th>
+                  <th className="c">Bid</th>
+                  <th>Best Player</th>
+                  <th className="c">Earners</th>
+                  <th className="c">Proj. Payout</th>
+                  <th className="c">ROI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamStandings.map((t, i) => {
+                  const bg =
+                    i === 0
+                      ? "#f3ecd3"
+                      : i === 1
+                        ? "#f7f3e3"
+                        : i === 2
+                          ? "#fbf5e7"
+                          : i % 2 === 0
+                            ? "#fffdf7"
+                            : "#fbf8ef";
+
+                  return (
+                    <tr key={t.team}>
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: i === 0 ? "#1b5e3b" : i < 3 ? COLORS.gold : COLORS.muted,
+                          fontWeight: "bold",
+                          fontSize: i < 3 ? 16 : 13,
+                        }}
+                      >
+                        {i + 1}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        <span
+                          className="tag"
+                          style={{
+                            background: TEAM_COLORS[t.team] || "#333",
+                            opacity: 0.92,
+                            fontSize: 13,
+                            padding: "4px 10px",
+                          }}
+                        >
+                          {t.team}
+                        </span>
+                      </td>
+
+                      <td className="c" style={{ background: bg, color: COLORS.muted }}>
+                        {fmtMoney(t.bid).replace(".00", "")}
+                      </td>
+
+                      <td style={{ background: bg, color: "#1f2f24" }}>
+                        {t.best ? (
+                          <>
+                            {t.best}{" "}
+                            <span style={{ color: scoreColor(t.bestScore) }}>{fmtScore(t.bestScore)}</span>
+                          </>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: t.earners > 0 ? COLORS.gold : COLORS.empty,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {t.earners}
+                      </td>
+
+                      <td className="c" style={{ background: bg }}>
+                        <strong
+                          style={{
+                            color: t.payout > t.bid ? COLORS.positive : t.payout > 0 ? COLORS.gold : COLORS.empty,
+                            fontSize: 14,
+                          }}
+                        >
+                          {t.payout > 0 ? fmtMoney(t.payout) : "--"}
+                        </strong>
+                      </td>
+
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          fontWeight: "bold",
+                          color: t.roi >= 0 ? COLORS.positive : COLORS.negative,
+                        }}
+                      >
+                        {t.payout > 0 ? `${t.roi >= 0 ? "+" : ""}${(t.roi * 100).toFixed(1)}%` : "--"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {tab === "payouts" && (
+            <div style={{ maxWidth: 480, paddingTop: 12 }}>
+              <div
+                style={{
+                  background: COLORS.panel,
+                  border: `1px solid ${COLORS.border}`,
+                  padding: "10px 16px",
+                  marginBottom: 14,
+                  fontSize: 12,
+                  color: COLORS.muted,
+                  borderRadius: 2,
+                }}
+              >
+                <strong style={{ color: COLORS.gold }}>Tie Rule: </strong>
+                Positions 2-20 pool their prizes and split equally. Position 1 always pays full{" "}
+                {fmtMoney(BASE_PAYOUTS[0])}. Total distributed = $146,454.
+              </div>
+
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th className="c">Place</th>
+                    <th className="c">Base Prize</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BASE_PAYOUTS.map((amt, i) => {
+                    const pos = i + 1;
+                    const suf = { 1: "st", 2: "nd", 3: "rd" }[pos] || "th";
+                    const bg = pos <= 3 ? "#f7f3e3" : i % 2 === 0 ? "#fffdf7" : "#fbf8ef";
+
+                    return (
+                      <tr key={pos}>
+                        <td
+                          className="c"
+                          style={{
+                            background: bg,
+                            color: pos <= 3 ? COLORS.gold : COLORS.muted,
+                            fontWeight: pos <= 3 ? "bold" : "normal",
+                          }}
+                        >
+                          {pos}
+                          {suf}
+                        </td>
+                        <td
+                          className="c"
+                          style={{
+                            background: bg,
+                            color: pos <= 3 ? COLORS.gold : "#1f2f24",
+                            fontWeight: pos <= 3 ? "bold" : "normal",
+                          }}
+                        >
+                          {fmtMoney(amt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
