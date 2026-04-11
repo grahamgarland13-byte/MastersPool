@@ -25,6 +25,24 @@ const TEAM_COLORS = {
   BAR: "#3d7f7b",
 };
 
+const COLORS = {
+  pageBg: "#ffffff",
+  boardBg: "#fffdf7",
+  boardTop: "#1c5a38",
+  boardTopDark: "#15492d",
+  mastersGreen: "#1f5e3b",
+  mastersGold: "#c8a951",
+  border: "#1f1f1f",
+  grid: "#2a2a2a",
+  text: "#171717",
+  muted: "#5c5c5c",
+  positive: "#178a46",
+  negative: "#c83232",
+  even: "#111111",
+  empty: "#9b9b9b",
+  cream: "#f3eedf",
+};
+
 // [displayName, [[team,pct],...], [aliases], r1_seed, r2_seed]
 const POOL = [
   ["Burns, Sam", [["KING", 1]], ["sam burns", "burns"], -5, null],
@@ -63,7 +81,7 @@ const POOL = [
   ["Garcia, Sergio", [["VERCHOTTA", 0.5]], ["sergio garcia", "garcia"], 3, null],
   ["Henley, Russell", [["HOCH", 0.333], ["ORR", 0.333], ["BARRY", 0.167], ["GUTSCHOW", 0.167]], ["russell henley", "henley"], 3, null],
   ["Hojgaard, Rasmus", [["BAR", 0.5], ["KRAHN", 0.5]], ["rasmus hojgaard", "rasmus højgaard", "rasmus hogaard"], 3, null],
-  ["Hojgaard, Nicolai", [["BAR", 0.5], ["KRAHN", 0.5]], ["nicolai hojgaard", "nicolai højgaard", "nicolai hogaard"], 3, null],
+  ["Hojgaard, nICOLAI", [["BAR", 0.5], ["KRAHN", 0.5]], ["nICOLAI hojgaard", "nICOLAI højgaard", "nICOLAI hogaard"], 3, null],
   ["Watson, Bubba", [["KRAHN", 0.333]], ["bubba watson", "watson"], 4, null],
   ["DeChambeau, Bryson", [["KRAHN", 0.5], ["KING", 0.25], ["MALLOY", 0.25]], ["bryson dechambeau", "dechambeau"], 4, null],
   ["Rahm, Jon", [["VERCHOTTA", 0.5]], ["jon rahm", "rahm"], 6, null],
@@ -79,8 +97,7 @@ const BASE_PAYOUTS = [
   2196.81, 2196.81, 2196.81, 2196.81, 2196.81,
 ];
 
-const PARS = [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4];
-
+// - HELPERS -
 function fmtScore(s) {
   if (s === null || s === undefined) return "–";
   if (s === 0) return "E";
@@ -95,10 +112,16 @@ function fmtMoney(n) {
   });
 }
 
+function scoreColor(s) {
+  if (s === null || s === undefined) return COLORS.muted;
+  if (s < 0) return COLORS.positive;
+  if (s > 0) return COLORS.negative;
+  return COLORS.even;
+}
+
 function parseScore(value) {
   if (value === null || value === undefined || value === "") return null;
   const str = String(value).trim();
-  if (!str) return null;
   if (str === "E" || str.toLowerCase() === "even") return 0;
   const n = parseInt(str, 10);
   return Number.isNaN(n) ? null : n;
@@ -153,13 +176,23 @@ function matchPlayer(name) {
   return null;
 }
 
-function normalizePlayerScores(r1, r2, total) {
+function normalizePlayerScores(r1, r2, total, displayName = "") {
   const hasR1 = r1 !== null && r1 !== undefined;
   const hasR2 = r2 !== null && r2 !== undefined;
   const hasTotal = total !== null && total !== undefined;
 
   if (hasR1 && hasR2) {
-    return { r1, r2, total: r1 + r2 };
+    const computed = r1 + r2;
+    if (hasTotal && computed !== total) {
+      console.log("Score mismatch detected:", {
+        player: displayName,
+        r1,
+        r2,
+        espnTotal: total,
+        computedTotal: computed,
+      });
+    }
+    return { r1, r2, total: computed };
   }
 
   return {
@@ -201,192 +234,141 @@ function buildRows(liveMap) {
     const r1 = live?.r1 ?? p[3];
     const r2 = live?.r2 ?? p[4];
     const total = live?.total ?? ((p[3] ?? 0) + (p[4] ?? 0));
-    const missedCut = live?.thru === "MC";
 
     return {
       name: p[0],
-      shortName: p[0].split(",")[0].toUpperCase(),
       ownership: p[1],
       r1,
       r2,
       total,
-      thru: live?.thru ?? (p[4] !== null ? "F" : "–"),
-      missedCut,
+      thru: live?.thru ?? (p[4] !== null ? (p[0] === "Clark, Wyndham" ? "F" : "*") : "–"),
       live: !!live,
     };
   }).sort((a, b) => {
-    if (a.missedCut !== b.missedCut) return a.missedCut ? 1 : -1;
     if (a.total !== b.total) return a.total - b.total;
     return a.name.localeCompare(b.name);
   });
 }
 
-function parseMastersScreenReaderText(text) {
-  const clean = String(text || "").replace(/\s+/g, " ").trim();
+// - ESPN FETCH -
+async function fetchESPN() {
+  const url = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`ESPN API ${res.status}`);
 
-  const nameMatch = clean.match(/^Player\s+(.+?),\s*Position/i);
-  const todayMatch = clean.match(/Today's score is\s*([+\-]?\d+|E)/i);
-  const totalMatch = clean.match(/To par total score is\s*([+\-]?\d+|E)/i);
-  const missedCut = /MISSED CUT/i.test(clean);
+  const data = await res.json();
+  const events = data?.events || [];
+  const masters =
+    events.find(
+      (e) =>
+        e?.name?.toLowerCase().includes("masters") ||
+        e?.shortName?.toLowerCase().includes("masters")
+    ) || events[0];
 
-  return {
-    rawName: nameMatch?.[1]?.trim() || "",
-    today: parseScore(todayMatch?.[1] ?? null),
-    total: parseScore(totalMatch?.[1] ?? null),
-    missedCut,
-  };
-}
+  if (!masters) throw new Error("No event found in ESPN feed");
 
-function extractMastersPlayersFromHtml(html) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const allSection = doc.querySelector("#leaderBoardPlayersContent");
-  if (!allSection) throw new Error("Masters leaderboard HTML structure not found");
+  const comp = masters?.competitions?.[0];
+  if (!comp) throw new Error("No competition data");
 
-  const nodes = Array.from(allSection.querySelectorAll(".screen-reader-only"));
-  const players = [];
+  const status = comp?.status?.type?.description || "In Progress";
+  const round = comp?.status?.period ? `Round ${comp.status.period}` : "In Progress";
 
-  for (const node of nodes) {
-    const parsed = parseMastersScreenReaderText(node.textContent || "");
-    if (!parsed.rawName) continue;
+  const players = (comp?.competitors || [])
+    .map((c) => {
+      const name = c?.athlete?.displayName || "";
+      const scores = c?.linescores || [];
+      const r1 = scores[0] ? parseScore(scores[0].value ?? scores[0].displayValue) : null;
+      const r2 = scores[1] ? parseScore(scores[1].value ?? scores[1].displayValue) : null;
+      const total = parseScore(c?.score ?? c?.total);
+      const thru =
+        c?.status?.thru !== undefined && c?.status?.thru !== null
+          ? c.status.thru === 0
+            ? "F"
+            : String(c.status.thru)
+          : c?.status?.type?.completed
+            ? "F"
+            : "–";
 
-    const pool = matchPlayer(parsed.rawName);
-    const canonicalName = pool ? pool[0] : parsed.rawName;
-    const r2 = parsed.today;
-    const total = parsed.total;
-    const r1 = r2 !== null && total !== null ? total - r2 : null;
+      return { name, r1, r2, total, thru };
+    })
+    .filter((p) => p.name);
 
-    players.push({
-      name: canonicalName,
-      r1,
-      r2,
-      total,
-      thru: parsed.missedCut ? "MC" : "F",
-    });
-  }
-
-  const deduped = new Map();
-  for (const p of players) {
-    if (!deduped.has(p.name)) deduped.set(p.name, p);
-  }
-
-  return Array.from(deduped.values());
-}
-
-async function fetchMastersLeaderboard() {
-  const res = await fetch("https://www.masters.com/en_US/scores/index.html");
-  if (!res.ok) throw new Error(`Masters HTML ${res.status}`);
-  const html = await res.text();
-  const players = extractMastersPlayersFromHtml(html);
-
-  return {
-    round: "Round 2",
-    status: "Masters Leaderboard",
-    players,
-  };
-}
-
-function buildHoleProgression(r1, r2, missedCut) {
-  if (missedCut) return [];
-  const final = r2 ?? 0;
-  const progression = [];
-  for (let i = 1; i <= 18; i++) {
-    progression.push(Math.round((final * i) / 18));
-  }
-  return progression;
-}
-
-function posArray(rows) {
-  return rows.map((r, i, arr) => {
-    let pos = 1;
-    for (let k = 0; k < i; k++) {
-      if (arr[k].missedCut && !r.missedCut) continue;
-      if (!arr[k].missedCut && r.missedCut) pos++;
-      else if (arr[k].total < r.total) pos++;
-    }
-    const same = arr.filter((x) => x.missedCut === r.missedCut && x.total === r.total).length;
-    return { pos, isTie: same > 1 };
-  });
-}
-
-function Cell({ children, width = 38, color = "#b1122f", bold = true }) {
-  return (
-    <div
-      style={{
-        width,
-        minWidth: width,
-        height: 38,
-        border: "1px solid #9d9d9d",
-        background: "#efeeeb",
-        boxShadow: "inset 0 0 0 2px #d9d8d4",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontWeight: bold ? 800 : 700,
-        color,
-        fontSize: 18,
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function HeaderCell({ children, width = 38, tall = false }) {
-  return (
-    <div
-      style={{
-        width,
-        minWidth: width,
-        height: tall ? 84 : 42,
-        borderRight: "1px solid #666",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: tall ? 18 : 17,
-        fontWeight: 700,
-        color: "#303336",
-        background: "#ddd9d4",
-      }}
-    >
-      {children}
-    </div>
-  );
+  return { round, status, players };
 }
 
 export default function MastersPool() {
+  const [tab, setTab] = useState("leaderboard");
   const [liveMap, setLiveMap] = useState({});
-  const [meta, setMeta] = useState({ round: "Round 2", status: "Seeded Data" });
+  const [meta, setMeta] = useState({
+    round: "Round 2",
+    status: "Seeded Data",
+  });
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [fetchError, setFetchError] = useState(null);
 
   const rows = useMemo(() => buildRows(liveMap), [liveMap]);
-  const posInfo = useMemo(() => posArray(rows), [rows]);
-  const prizes = useMemo(() => computePayouts(rows.filter((r) => !r.missedCut)), [rows]);
+  const prizes = useMemo(() => computePayouts(rows), [rows]);
 
-  const favorites = useMemo(() => {
-    const favIds = new Set(["McIlroy, Rory", "Scheffler, Scottie", "Bridgeman, Jacob", "DeChambeau, Bryson"]);
-    return rows.filter((r) => favIds.has(r.name)).slice(0, 4);
-  }, [rows]);
+  const teamStandings = useMemo(() => {
+    return Object.keys(TEAM_BIDS)
+      .map((team) => {
+        let payout = 0;
+        let best = null;
+        let bestScore = Infinity;
+        let earners = 0;
 
-  const allPlayers = useMemo(() => rows.slice(0, 18), [rows]);
+        rows.forEach((r, i) => {
+          const prize = prizes[i];
+          let ownsThisPlayer = false;
+
+          r.ownership.forEach(([t, pct]) => {
+            if (t !== team) return;
+            ownsThisPlayer = true;
+            payout += prize * pct;
+            if (r.total < bestScore) {
+              bestScore = r.total;
+              best = r.name;
+            }
+          });
+
+          if (prize > 0 && ownsThisPlayer) earners++;
+        });
+
+        return {
+          team,
+          bid: TEAM_BIDS[team],
+          payout,
+          best,
+          bestScore,
+          earners,
+          roi: (payout - TEAM_BIDS[team]) / TEAM_BIDS[team],
+        };
+      })
+      .sort((a, b) => b.payout - a.payout);
+  }, [rows, prizes]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
+
     try {
-      const data = await fetchMastersLeaderboard();
+      const data = await fetchESPN();
       const map = {};
+      const unmatched = [];
 
       for (const ap of data.players || []) {
         const pool = matchPlayer(ap.name);
-        if (!pool) continue;
+        if (!pool) {
+          unmatched.push(ap.name);
+          continue;
+        }
 
         const normalized = normalizePlayerScores(
           ap.r1 ?? null,
           ap.r2 ?? null,
-          ap.total ?? null
+          ap.total ?? null,
+          pool[0]
         );
 
         map[pool[0]] = {
@@ -397,10 +379,28 @@ export default function MastersPool() {
         };
       }
 
-      setLiveMap(map);
-      setMeta({ round: data.round, status: data.status });
+      if (unmatched.length) {
+        console.log("Unmatched ESPN players:", unmatched);
+      }
+
+      if (map["Hojgaard, Rasmus"]) {
+        console.log("Hojgaard mapped score:", map["Hojgaard, Rasmus"]);
+      }
+
+      if (Object.keys(map).length > 0) {
+        setLiveMap(map);
+        setMeta({ round: data.round, status: data.status });
+      } else {
+        setMeta({ round: "Seeded Data", status: "No matching live players found" });
+      }
+
+      setLastUpdated(new Date());
     } catch (e) {
       setFetchError(e?.message || "Unknown error");
+      setMeta((prev) => ({
+        round: prev.round || "Seeded Data",
+        status: "Seeded Data",
+      }));
     } finally {
       setLoading(false);
     }
@@ -410,313 +410,517 @@ export default function MastersPool() {
     refresh();
   }, [refresh]);
 
-  const renderBoardRow = (r, idx, favorite = false) => {
-    const p = rows.findIndex((x) => x.name === r.name);
-    const pos = posInfo[p];
-    const holes = buildHoleProgression(r.r1, r.r2, r.missedCut);
+  useEffect(() => {
+    const id = setInterval(refresh, 3 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [refresh]);
 
-    return (
-      <div
-        key={`${favorite ? "fav" : "all"}-${r.name}`}
-        style={{
-          display: "flex",
-          alignItems: "stretch",
-          borderBottom: "2px solid #444",
-          background: "#dcd9d4",
-        }}
-      >
-        <div style={{ padding: 4 }}>
-          <Cell width={38} color="#c5162f">
-            {r.missedCut ? "" : fmtScore(r.r1).replace("+", "")}
-          </Cell>
-        </div>
+  const posInfo = useMemo(() => {
+    return rows.map((r, i, arr) => {
+      let pos = 1;
+      for (let k = 0; k < i; k++) {
+        if (arr[k].total < r.total) pos++;
+      }
+      const ties = arr.filter((x) => x.total === r.total).length;
+      return { pos, isTie: ties > 1, tieCount: ties };
+    });
+  }, [rows]);
 
-        <div
-          style={{
-            width: 270,
-            minWidth: 270,
-            borderLeft: "2px solid #444",
-            borderRight: "2px solid #444",
-            display: "flex",
-            alignItems: "center",
-            padding: "0 12px",
-            fontWeight: 800,
-            fontSize: 20,
-            color: "#303336",
-            background: "#dcd9d4",
-            textTransform: "uppercase",
-          }}
-        >
-          {r.shortName}
-        </div>
+  const leaderboardRowBg = (pos, i) =>
+    pos === 1 ? "#f7f1da" : pos <= 3 ? "#fbf7ea" : i % 2 === 0 ? "#fffdf7" : "#fcfaf2";
 
-        {r.missedCut ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: 22,
-              color: "#333",
-              background: "#dcd9d4",
-              textTransform: "uppercase",
-            }}
-          >
-            MISSED CUT
-          </div>
-        ) : (
-          <div style={{ display: "flex", padding: 4, gap: 4 }}>
-            {holes.map((h, i) => {
-              const color = h < 0 ? "#c5162f" : h > 0 ? "#0c6a4b" : "#0c6a4b";
-              return (
-                <Cell key={i} color={color}>
-                  {h}
-                </Cell>
-              );
-            })}
-          </div>
-        )}
-
-        <div
-          style={{
-            width: 44,
-            minWidth: 44,
-            borderLeft: "2px solid #444",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#0b7a50",
-            fontSize: 24,
-            background: "#dcd9d4",
-          }}
-        >
-          ⚑
-        </div>
-
-        <div
-          style={{
-            width: 44,
-            minWidth: 44,
-            borderLeft: "1px solid #777",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: favorite ? "#e0b000" : "#80868b",
-            fontSize: 24,
-            background: "#dcd9d4",
-          }}
-        >
-          ★
-        </div>
-      </div>
-    );
-  };
+  const teamRowBg = (i) =>
+    i === 0 ? "#f7f1da" : i === 1 ? "#fbf7ea" : i % 2 === 0 ? "#fffdf7" : "#fcfaf2";
 
   return (
     <div
       style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(180deg, #2866d4 0%, #3d8cf0 38%, #7ec7ff 55%, #5fa63b 56%, #2f6d21 100%)",
-        padding: "44px 20px 80px",
         fontFamily: "Arial, Helvetica, sans-serif",
+        background: COLORS.pageBg,
+        minHeight: "100vh",
+        color: COLORS.text,
+        padding: "24px 0 40px",
       }}
     >
       <div
         style={{
-          maxWidth: 1200,
+          maxWidth: 1220,
           margin: "0 auto",
-          position: "relative",
+          background: COLORS.boardBg,
+          border: `2px solid ${COLORS.border}`,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
         }}
       >
+        <style>{`
+          * { box-sizing: border-box; }
+          .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+          .tbl th, .tbl td { border: 1px solid ${COLORS.grid}; }
+          .tbl th {
+            padding: 8px 8px;
+            text-align: left;
+            background: ${COLORS.cream};
+            color: #111;
+            font-size: 11px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            font-weight: 800;
+          }
+          .tbl th.c, .tbl td.c { text-align: center; }
+          .tbl td {
+            padding: 7px 8px;
+            background: ${COLORS.boardBg};
+            color: ${COLORS.text};
+          }
+          .tbl tr:hover td { background: #f6f1e2; }
+          .teamTag {
+            display: inline-block;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 0;
+            margin-right: 4px;
+            margin-bottom: 3px;
+            font-weight: 700;
+            letter-spacing: .02em;
+          }
+          .btn {
+            background: #fff;
+            border: 1px solid #111;
+            color: #111;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 11px;
+            letter-spacing: .06em;
+            font-family: Arial, Helvetica, sans-serif;
+            text-transform: uppercase;
+            font-weight: 700;
+          }
+          .btn:hover { background: #f1ead8; }
+          .btn:disabled { opacity: .5; cursor: default; }
+        `}</style>
+
         <div
           style={{
-            width: 120,
-            height: 120,
-            background: "linear-gradient(180deg,#2c5a31,#15381d)",
-            position: "absolute",
-            left: "50%",
-            bottom: -110,
-            transform: "translateX(-50%)",
-            borderRadius: "0 0 20px 20px",
-            boxShadow: "inset 0 0 25px rgba(0,0,0,.35)",
-          }}
-        />
-        <div
-          style={{
-            background: "#d7d4cf",
-            border: "3px solid #666",
-            boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            overflow: "hidden",
-            position: "relative",
+            background: `linear-gradient(180deg, ${COLORS.boardTop}, ${COLORS.boardTopDark})`,
+            borderBottom: `4px solid ${COLORS.mastersGold}`,
+            padding: "12px 20px 10px",
           }}
         >
           <div
             style={{
-              height: 92,
-              background: "#efeeeb",
-              borderBottom: "3px solid #444",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              position: "relative",
-              clipPath: "ellipse(60% 100% at 50% 0%)",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                bottom: 6,
-                fontSize: 64,
-                fontWeight: 900,
-                color: "#23272b",
-                letterSpacing: 2,
-              }}
-            >
-              LEADERS
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              borderBottom: "3px solid #444",
-              background: "#ddd9d4",
-            }}
-          >
-            <div
-              style={{
-                width: 46,
-                minWidth: 46,
-                borderRight: "2px solid #444",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                writingMode: "vertical-rl",
-                textOrientation: "upright",
-                fontSize: 14,
-                color: "#303336",
-                letterSpacing: 1,
-                padding: "6px 0",
-              }}
-            >
-              PRIOR
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", borderBottom: "1px solid #666" }}>
-                <div
-                  style={{
-                    width: 270,
-                    minWidth: 270,
-                    borderRight: "2px solid #444",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 36,
-                    fontWeight: 500,
-                    letterSpacing: 6,
-                    color: "#303336",
-                    height: 54,
-                  }}
-                >
-                  HOLE
-                </div>
-                {Array.from({ length: 18 }, (_, i) => (
-                  <HeaderCell key={i}>{i + 1}</HeaderCell>
-                ))}
-                <HeaderCell width={44} tall>
-                  <div style={{ lineHeight: 0.8, textAlign: "center", fontSize: 14 }}>T<br />R<br />A<br />C<br />K</div>
-                </HeaderCell>
-                <HeaderCell width={44} tall>
-                  <div style={{ lineHeight: 0.8, textAlign: "center", fontSize: 14 }}>F<br />A<br />V</div>
-                </HeaderCell>
-              </div>
-
-              <div style={{ display: "flex" }}>
-                <div
-                  style={{
-                    width: 270,
-                    minWidth: 270,
-                    borderRight: "2px solid #444",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 34,
-                    fontWeight: 500,
-                    letterSpacing: 5,
-                    color: "#303336",
-                    height: 42,
-                  }}
-                >
-                  PAR
-                </div>
-                {PARS.map((p, i) => (
-                  <HeaderCell key={i}>{p}</HeaderCell>
-                ))}
-                <div style={{ width: 44 }} />
-                <div style={{ width: 44 }} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ background: "#d7d4cf" }}>
-            <div
-              style={{
-                height: 42,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 34,
-                fontWeight: 900,
-                borderBottom: "2px solid #666",
-                background: "#d7d4cf",
-              }}
-            >
-              FAVORITES
-            </div>
-            {favorites.map((r, i) => renderBoardRow(r, i, true))}
-
-            <div
-              style={{
-                height: 42,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 34,
-                fontWeight: 900,
-                borderTop: "2px solid #666",
-                borderBottom: "2px solid #666",
-                background: "#d7d4cf",
-              }}
-            >
-              ALL PLAYERS
-            </div>
-            {allPlayers.map((r, i) => renderBoardRow(r, i, false))}
-          </div>
-
-          <div
-            style={{
-              height: 86,
-              background: "linear-gradient(180deg,#3d6740,#254629)",
-              borderTop: "3px solid #2f5a33",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "0 24px",
-              color: "#fff",
-              fontSize: 14,
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            <div style={{ fontWeight: 700 }}>
-              {loading ? "Refreshing..." : meta.status}
-              {fetchError ? ` — ${fetchError}` : ""}
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#ebf3eb",
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                }}
+              >
+                Augusta National
+              </div>
+              <div
+                style={{
+                  fontSize: 32,
+                  lineHeight: 1,
+                  color: "#ffffff",
+                  fontWeight: 900,
+                  letterSpacing: ".03em",
+                  textTransform: "uppercase",
+                  marginTop: 4,
+                }}
+              >
+                Leaders
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#ebf3eb",
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                  marginTop: 6,
+                }}
+              >
+                Masters Pool Tracker
+              </div>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>{meta.round}</div>
-            <div style={{ fontSize: 14 }}>ⓘ About the Leader Board</div>
+
+            <button className="btn" onClick={refresh} disabled={loading}>
+              {loading ? "Fetching..." : "Refresh"}
+            </button>
           </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 10,
+              alignItems: "center",
+            }}
+          >
+            {[meta.round, meta.status, "Pool payouts live"].map((lbl, i) => (
+              <span
+                key={i}
+                style={{
+                  background: i === 1 ? COLORS.mastersGold : "#ffffff",
+                  color: i === 1 ? "#111111" : COLORS.mastersGreen,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: "4px 8px",
+                  border: "1px solid #111",
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {lbl}
+              </span>
+            ))}
+
+            {fetchError ? (
+              <span style={{ color: "#ffe6e6", fontSize: 11, fontWeight: 700 }}>
+                ESPN fetch failed ({fetchError}) — showing seeded data
+              </span>
+            ) : lastUpdated ? (
+              <span style={{ color: "#eef6ee", fontSize: 11, fontWeight: 700 }}>
+                Updated {lastUpdated.toLocaleTimeString()} — refreshes every 3 min
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            borderBottom: `2px solid ${COLORS.border}`,
+            background: COLORS.cream,
+            padding: "0 18px",
+          }}
+        >
+          {[
+            ["leaderboard", "Leaderboard"],
+            ["teams", "Team Standings"],
+            ["payouts", "Payout Table"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                padding: "12px 16px 10px",
+                cursor: "pointer",
+                fontSize: 12,
+                letterSpacing: ".06em",
+                textTransform: "uppercase",
+                background: "none",
+                border: "none",
+                borderBottom: tab === id ? `4px solid ${COLORS.mastersGreen}` : "4px solid transparent",
+                marginBottom: -2,
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontWeight: 800,
+                color: tab === id ? "#111111" : COLORS.muted,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: "16px 18px 18px" }}>
+          {tab === "leaderboard" && (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th className="c" style={{ width: 64 }}>Pos</th>
+                  <th style={{ width: 220 }}>Player</th>
+                  <th style={{ width: 170 }}>Team(s)</th>
+                  <th className="c" style={{ width: 58 }}>R1</th>
+                  <th className="c" style={{ width: 58 }}>R2</th>
+                  <th className="c" style={{ width: 68 }}>Total</th>
+                  <th className="c" style={{ width: 70 }}>Thru</th>
+                  <th className="c" style={{ width: 130 }}>Prize</th>
+                  <th>Team Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const { pos, isTie, tieCount } = posInfo[i];
+                  const prize = prizes[i];
+                  const bg = leaderboardRowBg(pos, i);
+
+                  return (
+                    <tr key={r.name}>
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: pos === 1 ? COLORS.mastersGreen : "#111111",
+                          fontWeight: 900,
+                          fontSize: 13,
+                        }}
+                      >
+                        {(isTie ? "T" : "") + pos}
+                      </td>
+
+                      <td
+                        style={{
+                          background: bg,
+                          color: "#111111",
+                          fontWeight: pos <= 3 ? 800 : 700,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {r.name}
+                        {r.live && (
+                          <span
+                            style={{
+                              color: COLORS.mastersGreen,
+                              fontSize: 10,
+                              marginLeft: 6,
+                              fontWeight: 900,
+                              letterSpacing: ".05em",
+                            }}
+                          >
+                            LIVE
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        {r.ownership.map(([t, pct]) => (
+                          <span
+                            key={t}
+                            className="teamTag"
+                            style={{ background: TEAM_COLORS[t] || "#333" }}
+                          >
+                            {t}
+                            {pct < 1 ? ` ${Math.round(pct * 100)}%` : ""}
+                          </span>
+                        ))}
+                      </td>
+
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r1), fontWeight: 900 }}>
+                        {fmtScore(r.r1)}
+                      </td>
+                      <td className="c" style={{ background: bg, color: scoreColor(r.r2), fontWeight: 900 }}>
+                        {r.r2 != null ? fmtScore(r.r2) : "--"}
+                      </td>
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: scoreColor(r.total),
+                          fontWeight: 900,
+                          fontSize: 15,
+                        }}
+                      >
+                        {fmtScore(r.total)}
+                      </td>
+                      <td className="c" style={{ background: bg, color: "#111111", fontWeight: 700 }}>
+                        {r.thru}
+                      </td>
+
+                      <td className="c" style={{ background: bg }}>
+                        {prize > 0 ? (
+                          <span style={{ color: "#111111", fontWeight: 900 }}>
+                            {fmtMoney(prize)}
+                            {isTie && pos > 1 && (
+                              <span style={{ color: COLORS.muted, fontSize: 10 }}> /{tieCount}</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span style={{ color: COLORS.empty }}>--</span>
+                        )}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        {prize > 0 ? (
+                          r.ownership.map(([t, pct]) => (
+                            <span key={t} style={{ display: "inline-block", marginRight: 10, fontSize: 12 }}>
+                              <span style={{ color: TEAM_COLORS[t] || "#111", fontWeight: 900 }}>{t}</span>
+                              <span style={{ color: "#111", fontWeight: 700 }}> {fmtMoney(prize * pct)}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ color: COLORS.empty }}>--</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {tab === "teams" && (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th className="c" style={{ width: 64 }}>Rank</th>
+                  <th style={{ width: 130 }}>Team</th>
+                  <th className="c" style={{ width: 110 }}>Bid</th>
+                  <th>Best Player</th>
+                  <th className="c" style={{ width: 84 }}>Earners</th>
+                  <th className="c" style={{ width: 140 }}>Payout</th>
+                  <th className="c" style={{ width: 90 }}>ROI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamStandings.map((t, i) => {
+                  const bg = teamRowBg(i);
+
+                  return (
+                    <tr key={t.team}>
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: i === 0 ? COLORS.mastersGreen : "#111",
+                          fontWeight: 900,
+                          fontSize: 14,
+                        }}
+                      >
+                        {i + 1}
+                      </td>
+
+                      <td style={{ background: bg }}>
+                        <span
+                          className="teamTag"
+                          style={{
+                            background: TEAM_COLORS[t.team] || "#333",
+                            fontSize: 12,
+                            padding: "4px 10px",
+                          }}
+                        >
+                          {t.team}
+                        </span>
+                      </td>
+
+                      <td className="c" style={{ background: bg, color: "#111", fontWeight: 700 }}>
+                        {fmtMoney(t.bid).replace(".00", "")}
+                      </td>
+
+                      <td style={{ background: bg, color: "#111", fontWeight: 700 }}>
+                        {t.best ? (
+                          <>
+                            {t.best}{" "}
+                            <span style={{ color: scoreColor(t.bestScore), fontWeight: 900 }}>
+                              {fmtScore(t.bestScore)}
+                            </span>
+                          </>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          color: t.earners > 0 ? "#111" : COLORS.empty,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {t.earners}
+                      </td>
+
+                      <td className="c" style={{ background: bg }}>
+                        <strong
+                          style={{
+                            color: t.payout > t.bid ? COLORS.mastersGreen : "#111",
+                            fontSize: 14,
+                            fontWeight: 900,
+                          }}
+                        >
+                          {t.payout > 0 ? fmtMoney(t.payout) : "--"}
+                        </strong>
+                      </td>
+
+                      <td
+                        className="c"
+                        style={{
+                          background: bg,
+                          fontWeight: 900,
+                          color: t.roi >= 0 ? COLORS.mastersGreen : COLORS.negative,
+                        }}
+                      >
+                        {t.payout > 0 ? `${t.roi >= 0 ? "+" : ""}${(t.roi * 100).toFixed(1)}%` : "--"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {tab === "payouts" && (
+            <div style={{ maxWidth: 520, paddingTop: 4 }}>
+              <div
+                style={{
+                  background: COLORS.cream,
+                  border: `2px solid ${COLORS.border}`,
+                  padding: "10px 14px",
+                  marginBottom: 14,
+                  fontSize: 12,
+                  color: "#111",
+                  fontWeight: 700,
+                }}
+              >
+                <strong style={{ color: COLORS.mastersGreen }}>Tie Rule: </strong>
+                Positions 2-20 pool their prizes and split equally. Position 1 always pays full{" "}
+                {fmtMoney(BASE_PAYOUTS[0])}. Total distributed = $146,454.
+              </div>
+
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th className="c">Place</th>
+                    <th className="c">Base Prize</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BASE_PAYOUTS.map((amt, i) => {
+                    const pos = i + 1;
+                    const suf = { 1: "st", 2: "nd", 3: "rd" }[pos] || "th";
+                    const bg = pos <= 3 ? "#fbf7ea" : i % 2 === 0 ? "#fffdf7" : "#fcfaf2";
+
+                    return (
+                      <tr key={pos}>
+                        <td
+                          className="c"
+                          style={{
+                            background: bg,
+                            color: "#111",
+                            fontWeight: pos <= 3 ? 900 : 700,
+                          }}
+                        >
+                          {pos}{suf}
+                        </td>
+                        <td
+                          className="c"
+                          style={{
+                            background: bg,
+                            color: "#111",
+                            fontWeight: pos <= 3 ? 900 : 700,
+                          }}
+                        >
+                          {fmtMoney(amt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
