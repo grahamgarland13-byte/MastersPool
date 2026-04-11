@@ -28,6 +28,26 @@ const TEAM_COLORS = {
   BAR: "#005a5a",
 };
 
+const BASE_PAYOUTS = [
+  27093.99, 20503.56, 16109.94, 13180.86, 11716.32,
+  7322.7, 7322.7, 5858.16, 5858.16, 5858.16,
+  2929.08, 2929.08, 2929.08, 2929.08, 2929.08,
+  2196.81, 2196.81, 2196.81, 2196.81, 2196.81,
+];
+
+const POSITION_POT = 146454;
+
+const SPECIAL_PRIZES = [
+  { key: "r1Leader", label: "1st Round Leader", amount: 300 },
+  { key: "r2Leader", label: "2nd Round Leader", amount: 300 },
+  { key: "worst36", label: "Worst 36-Hole Score", amount: 150 },
+  { key: "lowAmateur", label: "Low Amateur", amount: 150 },
+];
+
+const SPECIAL_PRIZE_POT = SPECIAL_PRIZES.reduce((sum, p) => sum + p.amount, 0);
+
+const AMATEURS = new Set(["Fang, Ethan", "Howell, Mason"]);
+
 // [name, ownership, aliases, r1, r2, dnp?]
 const POOL = [
   // -- Active Competitors --
@@ -139,13 +159,6 @@ const POOL = [
   ["Aaron, Tommy", [["ORR", 0.5], ["GUTSCHOW", 0.5]], ["tommy aaron"], null, null, true],
 ];
 
-const BASE_PAYOUTS = [
-  27093.99, 20503.56, 16109.94, 13180.86, 11716.32,
-  7322.7, 7322.7, 5858.16, 5858.16, 5858.16,
-  2929.08, 2929.08, 2929.08, 2929.08, 2929.08,
-  2196.81, 2196.81, 2196.81, 2196.81, 2196.81,
-];
-
 function fmtScore(s) {
   if (s === null || s === undefined) return "-";
   if (s === 0) return "E";
@@ -207,6 +220,10 @@ function matchPlayer(name) {
   return null;
 }
 
+function sumBasePayouts() {
+  return BASE_PAYOUTS.reduce((sum, n) => sum + n, 0);
+}
+
 function computePayouts(sorted) {
   const prizes = new Array(sorted.length).fill(0);
   let i = 0;
@@ -236,6 +253,95 @@ function computePayouts(sorted) {
   }
 
   return prizes;
+}
+
+function getOwnedTeamShares(playerName, ownershipMap, amount) {
+  const ownership = ownershipMap[playerName] || [];
+  return ownership.map(([team, pct]) => ({
+    team,
+    pct,
+    amount: amount * pct,
+  }));
+}
+
+function computeSpecialPrizeResults(rows) {
+  const ownershipMap = Object.fromEntries(rows.map((r) => [r.name, r.ownership]));
+
+  const validRows = rows.filter((r) => r.total !== null && r.total !== undefined);
+  const r1Rows = rows.filter((r) => r.r1 !== null && r.r1 !== undefined);
+  const r2Rows = rows.filter((r) => r.r2 !== null && r.r2 !== undefined);
+  const amateurRows = rows.filter((r) => AMATEURS.has(r.name) && r.total !== null && r.total !== undefined);
+
+  const minR1 = r1Rows.length ? Math.min(...r1Rows.map((r) => r.r1)) : null;
+  const minR2 = r2Rows.length ? Math.min(...r2Rows.map((r) => r.r2)) : null;
+  const max36 = validRows.length ? Math.max(...validRows.map((r) => r.total)) : null;
+  const lowAm = amateurRows.length ? Math.min(...amateurRows.map((r) => r.total)) : null;
+
+  const results = [
+    {
+      key: "r1Leader",
+      label: "1st Round Leader",
+      amount: 300,
+      winners: minR1 === null ? [] : r1Rows.filter((r) => r.r1 === minR1),
+      metricLabel: "R1",
+      metricValue: minR1,
+    },
+    {
+      key: "r2Leader",
+      label: "2nd Round Leader",
+      amount: 300,
+      winners: minR2 === null ? [] : r2Rows.filter((r) => r.r2 === minR2),
+      metricLabel: "R2",
+      metricValue: minR2,
+    },
+    {
+      key: "worst36",
+      label: "Worst 36-Hole Score",
+      amount: 150,
+      winners: max36 === null ? [] : validRows.filter((r) => r.total === max36),
+      metricLabel: "36 Holes",
+      metricValue: max36,
+    },
+    {
+      key: "lowAmateur",
+      label: "Low Amateur",
+      amount: 150,
+      winners: lowAm === null ? [] : amateurRows.filter((r) => r.total === lowAm),
+      metricLabel: "Total",
+      metricValue: lowAm,
+    },
+  ].map((prize) => {
+    const split = prize.winners.length ? prize.amount / prize.winners.length : 0;
+
+    return {
+      ...prize,
+      split,
+      winners: prize.winners.map((winner) => ({
+        ...winner,
+        teamShares: getOwnedTeamShares(winner.name, ownershipMap, split),
+      })),
+    };
+  });
+
+  return results;
+}
+
+function computeSpecialPrizeTeamTotals(prizeResults) {
+  const totals = {};
+
+  Object.keys(TEAM_BIDS).forEach((team) => {
+    totals[team] = 0;
+  });
+
+  prizeResults.forEach((prize) => {
+    prize.winners.forEach((winner) => {
+      winner.teamShares.forEach((share) => {
+        totals[share.team] = (totals[share.team] || 0) + share.amount;
+      });
+    });
+  });
+
+  return totals;
 }
 
 function buildRows(liveMap) {
@@ -282,15 +388,17 @@ async function fetchESPN() {
     .map((c) => {
       const name = c?.athlete?.displayName || "";
       const scores = c?.linescores || [];
-      const r1 = scores[0] ? parseScore(scores[0].value) : null;
-      const r2 = scores[1] ? parseScore(scores[1].value) : null;
-      const total = parseScore(c.score || "0");
+      const r1 = scores[0] ? parseScore(scores[0].value ?? scores[0].displayValue) : null;
+      const r2 = scores[1] ? parseScore(scores[1].value ?? scores[1].displayValue) : null;
+      const total = parseScore(c.score || c.total || "0");
       const thru =
         c?.status?.thru !== undefined
           ? c.status.thru === 0
             ? "F"
             : String(c.status.thru)
-          : "-";
+          : c?.status?.type?.completed
+            ? "F"
+            : "-";
 
       return { name, r1, r2, total, thru };
     })
@@ -360,6 +468,9 @@ export default function App() {
 
   const rows = useMemo(() => buildRows(liveMap), [liveMap]);
   const prizes = useMemo(() => computePayouts(rows), [rows]);
+  const positionPotTotal = useMemo(() => sumBasePayouts(), []);
+  const prizeResults = useMemo(() => computeSpecialPrizeResults(rows), [rows]);
+  const specialPrizeTeamTotals = useMemo(() => computeSpecialPrizeTeamTotals(prizeResults), [prizeResults]);
 
   const teamStandings = useMemo(() => {
     return Object.keys(TEAM_BIDS)
@@ -387,18 +498,23 @@ export default function App() {
           if (ownsThisRow && prize > 0) earners++;
         });
 
+        const specialPrizePayout = specialPrizeTeamTotals[team] || 0;
+        const totalPayout = payout + specialPrizePayout;
+
         return {
           team,
           bid: TEAM_BIDS[team],
-          payout,
+          payout: totalPayout,
+          positionPayout: payout,
+          specialPrizePayout,
           best,
           bestScore,
           earners,
-          roi: (payout - TEAM_BIDS[team]) / TEAM_BIDS[team],
+          roi: (totalPayout - TEAM_BIDS[team]) / TEAM_BIDS[team],
         };
       })
       .sort((a, b) => b.payout - a.payout);
-  }, [rows, prizes]);
+  }, [rows, prizes, specialPrizeTeamTotals]);
 
   const posInfo = useMemo(() => {
     return rows.map((r, i, arr) => {
@@ -559,6 +675,7 @@ export default function App() {
             ["teams", "Teams"],
             ["players", "Players"],
             ["payouts", "Payouts"],
+            ["prizes", "Prizes"],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -682,6 +799,19 @@ export default function App() {
                               </span>
                             )}
                           </div>
+                          {t.specialPrizePayout > 0 && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: MASTERS_GREEN,
+                                fontFamily: "Arial, sans-serif",
+                                marginTop: 2,
+                                fontWeight: "bold",
+                              }}
+                            >
+                              Prize bonus {fmtMoneyFull(t.specialPrizePayout)}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -898,7 +1028,8 @@ export default function App() {
             >
               <strong style={{ color: MASTERS_GREEN }}>Tie Rule: </strong>
               Tied positions 2-20 pool their prizes and split equally. 1st place always receives the full{" "}
-              {fmtMoneyFull(BASE_PAYOUTS[0])}.
+              {fmtMoneyFull(BASE_PAYOUTS[0])}. Position payouts total {fmtMoneyFull(POSITION_POT)}.
+              Special prizes are tracked separately on the Prizes tab for {fmtMoneyFull(SPECIAL_PRIZE_POT)}.
             </div>
 
             <div
@@ -974,8 +1105,10 @@ export default function App() {
                 color: "#888",
               }}
             >
-              <span>Total pool</span>
-              <span style={{ fontWeight: "bold", color: MASTERS_GREEN }}>$146,454</span>
+              <span>Position pot</span>
+              <span style={{ fontWeight: "bold", color: MASTERS_GREEN }}>
+                {fmtMoneyFull(positionPotTotal)}
+              </span>
             </div>
 
             <div
@@ -986,6 +1119,206 @@ export default function App() {
                 marginTop: -1,
               }}
             />
+          </div>
+        )}
+
+        {tab === "prizes" && (
+          <div>
+            <div
+              style={{
+                background: "#fff",
+                border: "1.5px solid #c8ddd2",
+                borderRadius: 10,
+                padding: "12px 14px",
+                margin: "8px 0 14px",
+                fontSize: 12,
+                color: "#444",
+                fontFamily: "Arial, sans-serif",
+                lineHeight: 1.6,
+              }}
+            >
+              <strong style={{ color: MASTERS_GREEN }}>Special prizes: </strong>
+              1st Round Leader ($300), 2nd Round Leader ($300), Worst 36-Hole Score ($150), and Low Amateur ($150).
+            </div>
+
+            {prizeResults.map((prize) => (
+              <div
+                key={prize.key}
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid #dce7e0",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  marginBottom: 10,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "bold",
+                        color: "#111",
+                        fontFamily: "Georgia, serif",
+                      }}
+                    >
+                      {prize.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#666",
+                        fontFamily: "Arial, sans-serif",
+                        marginTop: 2,
+                      }}
+                    >
+                      {prize.metricLabel}: {fmtScore(prize.metricValue)}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "bold",
+                      color: MASTERS_GREEN,
+                      fontFamily: "Georgia, serif",
+                    }}
+                  >
+                    {fmtMoneyFull(prize.amount)}
+                  </div>
+                </div>
+
+                {prize.winners.length === 0 ? (
+                  <div style={{ color: "#999", fontFamily: "Arial, sans-serif", fontSize: 12 }}>
+                    No winner available yet.
+                  </div>
+                ) : (
+                  prize.winners.map((winner) => (
+                    <div
+                      key={`${prize.key}-${winner.name}`}
+                      style={{
+                        borderTop: "1px solid #edf2ee",
+                        paddingTop: 10,
+                        marginTop: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 15,
+                              fontWeight: "bold",
+                              color: "#111",
+                              fontFamily: "Georgia, serif",
+                            }}
+                          >
+                            {winner.name.split(", ").reverse().join(" ")}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#666",
+                              fontFamily: "Arial, sans-serif",
+                              marginTop: 3,
+                            }}
+                          >
+                            Award share: {fmtMoneyFull(prize.split)}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: "right" }}>
+                          <ScorePill score={winner.total} size="sm" />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
+                        {winner.teamShares.length ? (
+                          winner.teamShares.map((share) => (
+                            <span
+                              key={`${prize.key}-${winner.name}-${share.team}`}
+                              style={{
+                                background: TEAM_COLORS[share.team] || "#444",
+                                color: "#fff",
+                                fontSize: 10,
+                                padding: "3px 7px",
+                                borderRadius: 3,
+                                fontFamily: "Arial, sans-serif",
+                                letterSpacing: ".02em",
+                              }}
+                            >
+                              {share.team} {fmtMoneyFull(share.amount)}
+                            </span>
+                          ))
+                        ) : (
+                          <span
+                            style={{
+                              background: "#f3f3f3",
+                              color: "#666",
+                              fontSize: 10,
+                              padding: "3px 7px",
+                              borderRadius: 3,
+                              fontFamily: "Arial, sans-serif",
+                            }}
+                          >
+                            No owned team
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+
+            <div
+              style={{
+                background: "#fff",
+                border: "1.5px solid #dce7e0",
+                borderRadius: 10,
+                padding: "12px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "#666",
+                  fontFamily: "Arial, sans-serif",
+                  textTransform: "uppercase",
+                  letterSpacing: ".06em",
+                }}
+              >
+                Prize pot total
+              </span>
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: MASTERS_GREEN,
+                  fontFamily: "Georgia, serif",
+                }}
+              >
+                {fmtMoneyFull(SPECIAL_PRIZE_POT)}
+              </span>
+            </div>
           </div>
         )}
       </div>
